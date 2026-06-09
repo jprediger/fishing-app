@@ -1,0 +1,25 @@
+# Infra de desenvolvimento: Postgres + pgAdmin.
+# O backend roda direto na máquina (./gradlew bootRun) e conecta no Postgres aqui.
+#   docker compose up -d
+name: fishing-backend
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fishingdb}
+      POSTGRES_USER: ${POSTGRES_USER:-fishing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fishing123}
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+      
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

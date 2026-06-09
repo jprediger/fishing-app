@@ -1,0 +1,25 @@
+# Stack completo (infra + backend buildado a partir do Dockerfile de produção).
+# Sobe sobre o docker-compose.yml base (reaproveita postgres + network):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+name: fishing-backend
+services:
+  app:
+    build: .
+    container_name: fishing-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fishingdb}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-fishing}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fishing123}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+    depends_on:
+      - postgres
