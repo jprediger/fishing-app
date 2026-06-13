@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necessário para carregar os tiles do mapa (OpenStreetMap). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="mobile_app"
         android:name="${applicationName}"
