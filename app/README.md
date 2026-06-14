@@ -1,6 +1,6 @@
 # Fishing App — Mobile (Flutter)
 
-Aplicativo mobile do projeto de pesca (Univates). Consome a API REST do [backend](../backend/README.md) e funciona em modo mock por padrão, sem precisar do backend no ar.
+Aplicativo mobile do projeto de pesca (Univates). Consome a API REST do [backend](../backend/README.md). Em dev, o backend precisa estar no ar.
 
 ## Stack
 
@@ -37,7 +37,7 @@ flutter doctor
 # 1. Instala as dependências
 flutter pub get
 
-# 2. Roda o app (modo mock por padrão — não precisa do backend)
+# 2. Roda o app
 flutter run
 ```
 
@@ -48,17 +48,7 @@ flutter devices
 flutter run -d chrome      # exemplo: rodar no navegador
 ```
 
-## Modo mock vs. backend real
-
-Por padrão o app usa um catálogo de peixes mockado (`lib/services/mock_data.dart`), no mesmo formato paginado que o backend retorna. Assim dá para desenvolver a UI sem subir a API.
-
-Para apontar para o backend real:
-
-```bash
-flutter run --dart-define=USE_MOCK=false
-```
-
-### Endereço do backend
+## Endereço do backend
 
 O `ApiConfig` (`lib/config/api_config.dart`) escolhe a URL base conforme a plataforma:
 
@@ -70,9 +60,10 @@ O `ApiConfig` (`lib/config/api_config.dart`) escolhe a URL base conforme a plata
 Para sobrescrever (ex.: backend em outra máquina da rede):
 
 ```bash
-flutter run --dart-define=USE_MOCK=false \
-            --dart-define=API_BASE_URL=http://192.168.0.10:8080
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 ```
+
+Sem backend, login e mapas falham.
 
 ## Testes
 
@@ -82,7 +73,9 @@ flutter test
 
 | Arquivo                      | O que cobre                                            |
 |------------------------------|--------------------------------------------------------|
-| `test/fish_service_test.dart`| `FishService` com um `MockClient` (parsing do `Page`)  |
+| `test/fish_service_test.dart` | `FishService` com `MockClient`                         |
+| `test/water_body_service_test.dart` | `WaterBodyService` com `MockClient` e `nearest` |
+| `test/map_screen_test.dart`   | Pin solto e card do mapa                               |
 | `test/widget_test.dart`      | Renderização de widgets                                |
 | `test/app_e2e_test.dart`     | Fluxo de ponta a ponta entre as abas                   |
 
@@ -95,7 +88,7 @@ flutter build ios        # iOS (requer macOS + Xcode)
 flutter build web        # Web
 ```
 
-Lembre de incluir o `--dart-define=USE_MOCK=false` (e, se necessário, `API_BASE_URL`) no build que aponta para o backend real.
+Lembre de incluir `--dart-define=API_BASE_URL=...` quando o backend não estiver em `localhost`.
 
 ## Estrutura de pastas
 
@@ -108,10 +101,11 @@ app/lib/
 │   └── fish.dart          # modelo Fish + enum FishType (espelha o backend)
 ├── screens/
 │   ├── home_shell.dart    # navegação entre as abas (Mapa, Buscar, Eu)
-│   ├── map_screen.dart    # mapa com pontos de pesca
+│   ├── map_screen.dart    # mapa, viewport real e pin solto
 │   ├── search_screen.dart # busca de espécies (consome /api/fish)
 │   └── profile_screen.dart# perfil do pescador
 └── services/
     ├── fish_service.dart  # acesso ao endpoint /api/fish
-    └── mock_data.dart     # catálogo mockado (MockClient)
+    ├── water_body_service.dart # acesso a /api/water-bodies
+    └── auth_service.dart   # auth e perfil
 ```

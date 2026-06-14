@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/fish.dart';
 import 'api_exception.dart';
-import 'mock_data.dart';
 
 // Reexportado para compatibilidade com quem importa `ApiException` daqui.
 export 'api_exception.dart';
@@ -13,21 +12,15 @@ export 'api_exception.dart';
 /// Acesso ao recurso `/api/fish` do backend.
 ///
 /// O [http.Client] é injetável para permitir testes com um cliente simulado.
-///
-/// Por padrão o app roda em modo mock (sem precisar do backend no ar). Para
-/// apontar para o backend real, rode com:
-/// `flutter run --dart-define=USE_MOCK=false`
 class FishService {
-  /// Define se o app usa dados mockados em vez do backend real.
-  static const bool useMock =
-      bool.fromEnvironment('USE_MOCK', defaultValue: true);
-
   final http.Client _client;
   final String _baseUrl;
+  final bool _ownsClient;
 
   FishService({http.Client? client, String? baseUrl})
-      : _client = client ?? (useMock ? createMockClient() : http.Client()),
-        _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+    : _client = client ?? http.Client(),
+      _ownsClient = client == null,
+      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   /// Busca a lista de peixes (primeira página). O backend retorna um
   /// objeto paginado do Spring, do qual extraímos o campo `content`.
@@ -36,8 +29,11 @@ class FishService {
 
     final http.Response response;
     try {
-      response = await _client.get(uri, headers: {'Accept': 'application/json'});
-    } catch (e) {
+      response = await _client.get(
+        uri,
+        headers: {'Accept': 'application/json'},
+      );
+    } catch (_) {
       throw ApiException('Não foi possível conectar ao servidor.');
     }
 
@@ -57,5 +53,7 @@ class FishService {
         .toList();
   }
 
-  void dispose() => _client.close();
+  void dispose() {
+    if (_ownsClient) _client.close();
+  }
 }

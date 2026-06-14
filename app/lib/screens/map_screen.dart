@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -12,34 +13,53 @@ import '../services/water_body_service.dart';
 class MapScreen extends StatefulWidget {
   final WaterBodyService? service;
 
-  const MapScreen({super.key, this.service});
+  /// Test hook: pre-seeds draft point when mark mode opens.
+  final LatLng? debugInitialDraftPoint;
+
+  const MapScreen({super.key, this.service, this.debugInitialDraftPoint});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
+enum _NearestStatus { idle, loading, found, notFound, error }
+
 class _MapScreenState extends State<MapScreen> {
   static const LatLng _initialCenter = LatLng(-30.0846, -51.2645);
+  static const double _initialZoom = 10.7;
+  static const double _minViewportZoom = 9.0;
+  static const double _viewportPadding = 0.2;
 
   final MapController _mapController = MapController();
   Timer? _viewportDebounce;
+  Timer? _nearestDebounce;
+  late final WaterBodyService _service;
+
+  int _viewportRequestSeq = 0;
+  int _nearestRequestSeq = 0;
   int _selectedIndex = 0;
   bool _loading = true;
   bool _refreshing = false;
+  bool _markingMode = false;
+  double _cameraZoom = _initialZoom;
   String? _error;
-  late final WaterBodyService _service;
+  String? _nearestError;
+  _Bbox? _loadedViewport;
+  LatLng? _draftPoint;
+  WaterBody? _nearestBody;
+  _NearestStatus _nearestStatus = _NearestStatus.idle;
   List<WaterBody> _waterBodies = const [];
 
   @override
   void initState() {
     super.initState();
     _service = widget.service ?? WaterBodyService();
-    _loadWaterBodies();
   }
 
   @override
   void dispose() {
     _viewportDebounce?.cancel();
+    _nearestDebounce?.cancel();
     if (widget.service == null) {
       _service.dispose();
     }
@@ -47,30 +67,86 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
-  Future<void> _loadWaterBodies({String? bbox}) async {
+  void _onMapReady() {
+    if (!mounted) return;
+    _syncCameraZoom(_mapController.camera.zoom);
+    _scheduleViewportLoad(_mapController.camera, force: true);
+  }
+
+  void _syncCameraZoom(double zoom) {
+    if (!mounted || (zoom - _cameraZoom).abs() < 0.01) return;
+    setState(() => _cameraZoom = zoom);
+  }
+
+  void _scheduleViewportLoad(MapCamera camera, {bool force = false}) {
+    _syncCameraZoom(camera.zoom);
+
+    if (camera.zoom < _minViewportZoom) {
+      _viewportDebounce?.cancel();
+      _viewportRequestSeq++;
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _error = null;
+        _waterBodies = const [];
+        _selectedIndex = 0;
+        _loadedViewport = null;
+      });
+      return;
+    }
+
+    final visibleBounds = camera.visibleBounds;
+    if (!force && _loadedViewport?.contains(visibleBounds) == true) {
+      return;
+    }
+
+    _viewportDebounce?.cancel();
+    final seq = ++_viewportRequestSeq;
+    final target = _Bbox.fromBounds(
+      visibleBounds,
+      paddingFactor: _viewportPadding,
+    );
+    final zoom = camera.zoom.round();
+
+    _viewportDebounce = Timer(const Duration(milliseconds: 350), () {
+      unawaited(_loadWaterBodies(target: target, zoom: zoom, seq: seq));
+    });
+  }
+
+  Future<void> _loadWaterBodies({
+    required _Bbox target,
+    required int zoom,
+    required int seq,
+  }) async {
     final loadingInitial = _waterBodies.isEmpty;
+    if (!mounted) return;
     setState(() {
-      if (loadingInitial) {
-        _loading = true;
-      } else {
-        _refreshing = true;
-      }
+      _loading = loadingInitial;
+      _refreshing = !loadingInitial;
       _error = null;
     });
 
     try {
-      final waterBodies = await _service.fetchWaterBodies(bbox: bbox);
-      if (!mounted) return;
+      final waterBodies = await _service.fetchWaterBodies(
+        bbox: target.toQueryString(),
+        zoom: zoom,
+      );
+      if (!mounted || seq != _viewportRequestSeq) return;
       setState(() {
         _waterBodies = waterBodies;
-        if (_selectedIndex >= waterBodies.length) {
-          _selectedIndex = 0;
-        }
+        _selectedIndex = waterBodies.isEmpty
+            ? 0
+            : _selectedIndex.clamp(0, waterBodies.length - 1);
         _loading = false;
         _refreshing = false;
+        _loadedViewport = target;
+        if (_waterBodies.isEmpty) {
+          _error = null;
+        }
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _viewportRequestSeq) return;
       setState(() {
         _error = e.message;
         _loading = false;
@@ -79,13 +155,100 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _scheduleViewportLoad(MapCamera camera) {
-    _viewportDebounce?.cancel();
-    _viewportDebounce = Timer(const Duration(milliseconds: 350), () {
-      final bounds = camera.visibleBounds;
-      final bbox = '${bounds.west},${bounds.south},${bounds.east},${bounds.north}';
-      unawaited(_loadWaterBodies(bbox: bbox));
+  void _toggleMarkMode() {
+    if (_markingMode) {
+      _exitMarkMode();
+      return;
+    }
+
+    setState(() => _markingMode = true);
+    _resetDraftSelection();
+    if (widget.debugInitialDraftPoint != null) {
+      _setDraftPoint(widget.debugInitialDraftPoint!);
+    }
+  }
+
+  void _exitMarkMode() {
+    setState(() => _markingMode = false);
+    _resetDraftSelection();
+  }
+
+  void _resetDraftSelection() {
+    _nearestDebounce?.cancel();
+    _nearestRequestSeq++;
+    if (!mounted) return;
+    setState(() {
+      _draftPoint = null;
+      _nearestBody = null;
+      _nearestError = null;
+      _nearestStatus = _NearestStatus.idle;
     });
+  }
+
+  void _onMapTap(TapPosition _, LatLng point) {
+    if (!_markingMode) return;
+    _setDraftPoint(point);
+  }
+
+  void _moveDraftByDelta(Offset delta) {
+    final draftPoint = _draftPoint;
+    if (draftPoint == null) return;
+
+    final camera = _mapController.camera;
+    final projected = camera.project(draftPoint);
+    final movedPoint = Point<double>(
+      projected.x + delta.dx,
+      projected.y + delta.dy,
+    );
+    _setDraftPoint(camera.unproject(movedPoint));
+  }
+
+  void _setDraftPoint(LatLng point) {
+    if (!mounted) return;
+    setState(() {
+      _draftPoint = point;
+      _nearestBody = null;
+      _nearestError = null;
+      _nearestStatus = _NearestStatus.loading;
+    });
+    _scheduleNearestLookup(point);
+  }
+
+  void _scheduleNearestLookup(LatLng point) {
+    _nearestDebounce?.cancel();
+    final seq = ++_nearestRequestSeq;
+    _nearestDebounce = Timer(const Duration(milliseconds: 400), () {
+      unawaited(_loadNearest(point, seq));
+    });
+  }
+
+  Future<void> _loadNearest(LatLng point, int seq) async {
+    try {
+      final waterBody = await _service.fetchNearest(
+        lat: point.latitude,
+        lon: point.longitude,
+      );
+      if (!mounted || seq != _nearestRequestSeq) return;
+      setState(() {
+        _nearestBody = waterBody;
+        _nearestError = null;
+        _nearestStatus = waterBody == null
+            ? _NearestStatus.notFound
+            : _NearestStatus.found;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || seq != _nearestRequestSeq) return;
+      setState(() {
+        _nearestBody = null;
+        _nearestError = e.message;
+        _nearestStatus = _NearestStatus.error;
+      });
+    }
+  }
+
+  void _recenter() {
+    _mapController.move(_initialCenter, _initialZoom);
+    _scheduleViewportLoad(_mapController.camera, force: true);
   }
 
   void _selectBody(int index) {
@@ -113,8 +276,14 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? _firstLatLng(dynamic coordinates) {
     if (coordinates is List && coordinates.isNotEmpty) {
       final first = coordinates.first;
-      if (first is List && first.length >= 2 && first[0] is num && first[1] is num) {
-        return LatLng((first[1] as num).toDouble(), (first[0] as num).toDouble());
+      if (first is List &&
+          first.length >= 2 &&
+          first[0] is num &&
+          first[1] is num) {
+        return LatLng(
+          (first[1] as num).toDouble(),
+          (first[0] as num).toDouble(),
+        );
       }
       if (first is List) {
         return _firstLatLng(first);
@@ -138,7 +307,11 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.water_drop, color: AppColors.primary, size: 28),
+                const Icon(
+                  Icons.water_drop,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -178,14 +351,14 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _handleCreateRecordStub() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Registro em breve.')));
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       body: Stack(
         children: [
@@ -193,10 +366,15 @@ class _MapScreenState extends State<MapScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _initialCenter,
-              initialZoom: 10.7,
+              initialZoom: _initialZoom,
+              onTap: _onMapTap,
               onPositionChanged: (camera, hasGesture) {
-                if (hasGesture) _scheduleViewportLoad(camera);
+                _syncCameraZoom(camera.zoom);
+                if (hasGesture) {
+                  _scheduleViewportLoad(camera);
+                }
               },
+              onMapReady: _onMapReady,
             ),
             children: [
               TileLayer(
@@ -210,21 +388,52 @@ class _MapScreenState extends State<MapScreen> {
               MarkerLayer(markers: _markers),
             ],
           ),
+          if (_loading)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0x1AFFFFFF),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
           _buildHeaderPill(),
-          if (_waterBodies.isNotEmpty) _buildCarousel(),
-          if (_refreshing) const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator()),
+          if (!_markingMode && _waterBodies.isNotEmpty) _buildCarousel(),
+          if (_refreshing)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(),
+            ),
           if (_error != null) _buildErrorBanner(),
-          if (_waterBodies.isEmpty && _error == null) _buildEmptyState(),
+          if (!_markingMode &&
+              _waterBodies.isEmpty &&
+              _error == null &&
+              _cameraZoom >= _minViewportZoom)
+            _buildEmptyState(),
+          if (_cameraZoom < _minViewportZoom) _buildZoomHint(),
+          if (_markingMode) _buildNearestCard(),
         ],
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 150),
-        child: FloatingActionButton(
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.primary,
-          elevation: 3,
-          onPressed: () => _mapController.move(_initialCenter, 10.7),
-          child: const Icon(Icons.my_location),
+        padding: EdgeInsets.only(bottom: _markingMode ? 172 : 150),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.small(
+              backgroundColor: _markingMode ? AppColors.deep : Colors.white,
+              foregroundColor: _markingMode ? Colors.white : AppColors.primary,
+              onPressed: _toggleMarkMode,
+              child: Icon(_markingMode ? Icons.close : Icons.add),
+            ),
+            const SizedBox(height: 12),
+            FloatingActionButton(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primary,
+              elevation: 3,
+              onPressed: _recenter,
+              child: const Icon(Icons.my_location),
+            ),
+          ],
         ),
       ),
     );
@@ -236,7 +445,8 @@ class _MapScreenState extends State<MapScreen> {
         padding: const EdgeInsets.all(12),
         child: Align(
           alignment: Alignment.topCenter,
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -258,29 +468,40 @@ class _MapScreenState extends State<MapScreen> {
                     gradient: AppColors.waterGradient,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.water, color: Colors.white, size: 18),
+                  child: Icon(
+                    _markingMode ? Icons.add_location_alt : Icons.water,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 10),
-                const Text(
-                  'Corpos d\'água',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                Text(
+                  _markingMode ? 'Marcar ponto' : 'Corpos d\'água',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
-                  child: Text(
-                    '${_waterBodies.length}',
-                    style: const TextStyle(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w800,
+                ),
+                if (!_markingMode) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_waterBodies.length}',
+                      style: const TextStyle(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -328,15 +549,20 @@ class _MapScreenState extends State<MapScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.water_drop,
-                            color: AppColors.primary, size: 20),
+                        const Icon(
+                          Icons.water_drop,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             body.name,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -375,8 +601,11 @@ class _MapScreenState extends State<MapScreen> {
                               fontSize: 13,
                             ),
                           ),
-                          Icon(Icons.chevron_right,
-                              color: AppColors.primary, size: 18),
+                          Icon(
+                            Icons.chevron_right,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
                         ],
                       ),
                     ),
@@ -446,6 +675,92 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildZoomHint() {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.center,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(18),
+              child: Text(
+                'Aproxime para ver os rios.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNearestCard() {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 150),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _nearestStatus == _NearestStatus.loading
+              ? _SelectionCard(
+                  key: const ValueKey('loading'),
+                  background: Colors.white,
+                  borderColor: AppColors.secondary.withValues(alpha: 0.3),
+                  child: const _SelectionLoading(),
+                )
+              : _nearestStatus == _NearestStatus.found && _nearestBody != null
+              ? _SelectionCard(
+                  key: const ValueKey('found'),
+                  background: Colors.white,
+                  borderColor: AppColors.primary.withValues(alpha: 0.2),
+                  child: _SelectionBody(
+                    body: _nearestBody!,
+                    onCreate: _handleCreateRecordStub,
+                    distanceLabel: _formatDistance(
+                      _nearestBody!.distanceMeters,
+                    ),
+                  ),
+                )
+              : _SelectionCard(
+                  key: const ValueKey('empty'),
+                  background: Colors.white,
+                  borderColor: Colors.red.withValues(alpha: 0.28),
+                  child: _SelectionEmpty(
+                    message: _nearestStatus == _NearestStatus.error
+                        ? (_nearestError ?? 'Falha ao buscar água próxima.')
+                        : _draftPoint == null
+                        ? 'Toque no mapa para marcar ponto.'
+                        : 'Nenhuma água num raio de 5 km.',
+                    onCreate: null,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDistance(double? distanceMeters) {
+    if (distanceMeters == null) return '~?';
+    if (distanceMeters < 1000) return '~${distanceMeters.round()} m';
+    return '~${(distanceMeters / 1000).toStringAsFixed(1)} km';
+  }
+
   List<Polyline<Object>> get _lineStrings {
     final lines = <Polyline<Object>>[];
     for (final body in _waterBodies) {
@@ -463,10 +778,12 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   List<Marker> get _markers {
-    return [
+    final markers = <Marker>[
       for (var i = 0; i < _waterBodies.length; i++)
         Marker(
-          point: _waterBodies[i].centerLocation ?? _fallbackCenter(_waterBodies[i]),
+          point:
+              _waterBodies[i].centerLocation ??
+              _fallbackCenter(_waterBodies[i]),
           width: 46,
           height: 46,
           child: GestureDetector(
@@ -475,6 +792,29 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
     ];
+
+    if (_markingMode && _draftPoint != null) {
+      markers.add(
+        Marker(
+          point: _draftPoint!,
+          width: 54,
+          height: 68,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanUpdate: (details) => _moveDraftByDelta(details.delta),
+            onPanEnd: (_) {
+              final point = _draftPoint;
+              if (point != null) {
+                _scheduleNearestLookup(point);
+              }
+            },
+            child: const _DraftPin(),
+          ),
+        ),
+      );
+    }
+
+    return markers;
   }
 
   List<Polyline<Object>> _linesForBody(WaterBody body) {
@@ -536,9 +876,15 @@ class _MapScreenState extends State<MapScreen> {
 
   Polygon<Object> _polygonFromCoordinates(dynamic coordinates) {
     final rings = coordinates is List ? coordinates : const [];
-    final outer = rings.isNotEmpty ? _latLngList(rings.first) : const <LatLng>[];
+    final outer = rings.isNotEmpty
+        ? _latLngList(rings.first)
+        : const <LatLng>[];
     final holes = rings.length > 1
-        ? rings.skip(1).map(_latLngList).where((ring) => ring.isNotEmpty).toList()
+        ? rings
+              .skip(1)
+              .map(_latLngList)
+              .where((ring) => ring.isNotEmpty)
+              .toList()
         : <List<LatLng>>[];
 
     return Polygon<Object>(
@@ -557,12 +903,210 @@ class _MapScreenState extends State<MapScreen> {
         .whereType<List>()
         .where((pair) => pair.length >= 2 && pair[0] is num && pair[1] is num)
         .map(
-          (pair) => LatLng(
-            (pair[1] as num).toDouble(),
-            (pair[0] as num).toDouble(),
-          ),
+          (pair) =>
+              LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble()),
         )
         .toList();
+  }
+}
+
+class _SelectionCard extends StatelessWidget {
+  final Widget child;
+  final Color background;
+  final Color borderColor;
+
+  const _SelectionCard({
+    super.key,
+    required this.child,
+    required this.background,
+    required this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _SelectionLoading extends StatelessWidget {
+  const _SelectionLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: const [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              'Buscando corpo d\'água mais próximo...',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionBody extends StatelessWidget {
+  final WaterBody body;
+  final VoidCallback onCreate;
+  final String distanceLabel;
+
+  const _SelectionBody({
+    required this.body,
+    required this.onCreate,
+    required this.distanceLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.water_drop, color: AppColors.primary, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  body.name,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(
+                distanceLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.deep,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${body.waterType.label}${body.source == null ? "" : " • ${body.source}"}'
+            '${body.osmId == null ? "" : " • OSM ${body.osmId}"}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: onCreate,
+              child: const Text('Criar registro aqui'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionEmpty extends StatelessWidget {
+  final String message;
+  final VoidCallback? onCreate;
+
+  const _SelectionEmpty({required this.message, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: onCreate == null ? Colors.red : AppColors.secondary,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor: Colors.black12,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: onCreate,
+              child: const Text('Criar registro aqui'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DraftPin extends StatelessWidget {
+  const _DraftPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.location_on,
+          color: Colors.redAccent,
+          size: 54,
+          shadows: [
+            Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
+          ],
+        ),
+        Icon(Icons.circle, color: Colors.white, size: 12),
+      ],
+    );
   }
 }
 
@@ -582,4 +1126,35 @@ class _MapPin extends StatelessWidget {
       ],
     );
   }
+}
+
+class _Bbox {
+  final double west;
+  final double south;
+  final double east;
+  final double north;
+
+  const _Bbox(this.west, this.south, this.east, this.north);
+
+  factory _Bbox.fromBounds(LatLngBounds bounds, {double paddingFactor = 0}) {
+    final latSpan = (bounds.north - bounds.south).abs();
+    final lonSpan = (bounds.east - bounds.west).abs();
+    final latPad = latSpan * paddingFactor;
+    final lonPad = lonSpan * paddingFactor;
+    return _Bbox(
+      bounds.west - lonPad,
+      bounds.south - latPad,
+      bounds.east + lonPad,
+      bounds.north + latPad,
+    );
+  }
+
+  bool contains(LatLngBounds bounds) {
+    return bounds.west >= west &&
+        bounds.east <= east &&
+        bounds.south >= south &&
+        bounds.north <= north;
+  }
+
+  String toQueryString() => '$west,$south,$east,$north';
 }

@@ -31,6 +31,7 @@ class WaterBody {
   final String? source;
   final double? centerLon;
   final double? centerLat;
+  final double? distanceMeters;
 
   const WaterBody({
     required this.id,
@@ -41,6 +42,7 @@ class WaterBody {
     this.source,
     this.centerLon,
     this.centerLat,
+    this.distanceMeters,
   });
 
   factory WaterBody.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class WaterBody {
       source: json['source'] as String?,
       centerLon: (json['centerLon'] as num?)?.toDouble(),
       centerLat: (json['centerLat'] as num?)?.toDouble(),
+      distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
     );
   }
 

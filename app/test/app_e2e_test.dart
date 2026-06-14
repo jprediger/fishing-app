@@ -16,6 +16,7 @@ import 'package:http/testing.dart';
 import 'package:mobile_app/main.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/fish_service.dart';
+import 'package:mobile_app/services/water_body_service.dart';
 import 'package:mobile_app/services/token_storage.dart';
 import 'package:mobile_app/state/auth_controller.dart';
 
@@ -33,6 +34,24 @@ const _pageJson = '''
 }
 ''';
 
+const _waterBodiesJson = '''
+[
+  {
+    "id": 1,
+    "name": "Lago Guaíba",
+    "waterType": "LAKE",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[[ -51.40, -30.14 ], [ -51.24, -30.22 ], [ -51.04, -30.16 ], [ -51.07, -29.98 ], [ -51.25, -29.93 ], [ -51.40, -30.14 ]]]
+    },
+    "osmId": 1001,
+    "source": "OSM",
+    "centerLon": -51.20,
+    "centerLat": -30.08
+  }
+]
+''';
+
 const _loginBody = {
   'token': 'jwt-123',
   'tokenType': 'Bearer',
@@ -48,9 +67,13 @@ const _loginBody = {
 Future<AuthController> _authenticated() async {
   final auth = AuthController(
     authService: AuthService(
-      client: MockClient((_) async => http.Response(
-          jsonEncode(_loginBody), 200,
-          headers: {'content-type': 'application/json; charset=utf-8'})),
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode(_loginBody),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
       baseUrl: 'http://test.local',
     ),
     storage: TokenStorage(store: FakeStore()),
@@ -60,14 +83,32 @@ Future<AuthController> _authenticated() async {
 }
 
 void main() {
-  testWidgets('autenticado: navega entre as abas e carrega peixes',
-      (tester) async {
+  testWidgets('autenticado: navega entre as abas e carrega peixes', (
+    tester,
+  ) async {
     final auth = await _authenticated();
-    final fishClient = MockClient((_) async => http.Response(_pageJson, 200,
-        headers: {'content-type': 'application/json; charset=utf-8'}));
+    final fishClient = MockClient(
+      (_) async => http.Response(
+        _pageJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
+    final waterClient = MockClient((request) async {
+      expect(request.url.path, '/api/water-bodies');
+      return http.Response(
+        _waterBodiesJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
 
     await tester.pumpWidget(
-      FishingApp(auth: auth, fishService: FishService(client: fishClient)),
+      FishingApp(
+        auth: auth,
+        fishService: FishService(client: fishClient),
+        waterBodyService: WaterBodyService(client: waterClient),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -90,11 +131,28 @@ void main() {
 
   testWidgets('logout volta ao login', (tester) async {
     final auth = await _authenticated();
-    final fishClient = MockClient((_) async => http.Response(_pageJson, 200,
-        headers: {'content-type': 'application/json; charset=utf-8'}));
+    final fishClient = MockClient(
+      (_) async => http.Response(
+        _pageJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
+    final waterClient = MockClient((request) async {
+      expect(request.url.path, '/api/water-bodies');
+      return http.Response(
+        _waterBodiesJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
 
     await tester.pumpWidget(
-      FishingApp(auth: auth, fishService: FishService(client: fishClient)),
+      FishingApp(
+        auth: auth,
+        fishService: FishService(client: fishClient),
+        waterBodyService: WaterBodyService(client: waterClient),
+      ),
     );
     await tester.pumpAndSettle();
 
