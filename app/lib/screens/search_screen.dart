@@ -231,7 +231,7 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Row(
               children: [
-                _FishAvatar(type: fish.type, size: 52),
+                _FishAvatar(type: fish.type, iconPath: fish.iconPath, size: 52),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
@@ -275,7 +275,7 @@ class _FishCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              _FishAvatar(type: fish.type, size: 48),
+              _FishAvatar(type: fish.type, iconPath: fish.iconPath, size: 48),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -340,21 +340,40 @@ Color _colorForType(FishType type) {
 
 class _FishAvatar extends StatelessWidget {
   final FishType type;
+  final String? iconPath;
   final double size;
 
-  const _FishAvatar({required this.type, required this.size});
+  const _FishAvatar({required this.type, this.iconPath, required this.size});
 
   @override
   Widget build(BuildContext context) {
     final color = _colorForType(type);
-    return Container(
+    final radius = BorderRadius.circular(14);
+    final path = iconPath;
+
+    final placeholder = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: radius,
       ),
       child: Icon(Icons.set_meal, color: color, size: size * 0.55),
+    );
+
+    if (path == null || path.isEmpty) return placeholder;
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: Image.network(
+        path,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+      ),
     );
   }
 }

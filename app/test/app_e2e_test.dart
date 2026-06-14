@@ -1,16 +1,25 @@
 // Teste end-to-end (headless) do app de pesca.
 //
-// Roda o widget tree completo (FishingApp) com um cliente HTTP simulado
-// injetado na camada de serviço, e verifica a navegação entre as abas
-// Mapa, Buscar e Eu, além do consumo do backend na aba Buscar.
+// Roda a árvore completa (FishingApp) através do AuthGate, com um
+// AuthController autenticado e um cliente HTTP simulado injetado na camada de
+// serviço. Verifica a navegação entre as abas, o consumo do catálogo e o
+// logout voltando ao login.
 //
 // Roda via: flutter test test/app_e2e_test.dart
 
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile_app/main.dart';
+import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/fish_service.dart';
+import 'package:mobile_app/services/token_storage.dart';
+import 'package:mobile_app/state/auth_controller.dart';
+
+import 'support/fake_store.dart';
 
 const _pageJson = '''
 {
@@ -24,36 +33,82 @@ const _pageJson = '''
 }
 ''';
 
+const _loginBody = {
+  'token': 'jwt-123',
+  'tokenType': 'Bearer',
+  'expiresIn': 604800,
+  'user': {
+    'id': 2,
+    'name': 'Pescador Demo',
+    'email': 'demo@fishing.local',
+    'role': 'USER',
+  },
+};
+
+Future<AuthController> _authenticated() async {
+  final auth = AuthController(
+    authService: AuthService(
+      client: MockClient((_) async => http.Response(
+          jsonEncode(_loginBody), 200,
+          headers: {'content-type': 'application/json; charset=utf-8'})),
+      baseUrl: 'http://test.local',
+    ),
+    storage: TokenStorage(store: FakeStore()),
+  );
+  await auth.login('demo@fishing.local', 'demo12345');
+  return auth;
+}
+
 void main() {
-  testWidgets('navega entre as abas e carrega peixes do backend',
+  testWidgets('autenticado: navega entre as abas e carrega peixes',
       (tester) async {
-    final client = MockClient((_) async => http.Response(_pageJson, 200,
+    final auth = await _authenticated();
+    final fishClient = MockClient((_) async => http.Response(_pageJson, 200,
         headers: {'content-type': 'application/json; charset=utf-8'}));
-    await tester
-        .pumpWidget(FishingApp(fishService: FishService(client: client)));
+
+    await tester.pumpWidget(
+      FishingApp(auth: auth, fishService: FishService(client: fishClient)),
+    );
     await tester.pumpAndSettle();
 
-    // Inicia na aba Mapa.
-    expect(find.text('Pontos de pesca'), findsOneWidget);
+    // Gate decide pelo HomeShell -> inicia no Mapa.
+    expect(find.text('Mapa'), findsWidgets);
+    expect(find.byType(NavigationBar), findsOneWidget);
 
-    // Vai para a aba Buscar.
+    // Aba Buscar carrega os peixes do backend simulado.
     await tester.tap(find.text('Buscar'));
     await tester.pumpAndSettle();
-
-    // Os dados do backend simulado aparecem.
     expect(find.text('Tucunaré'), findsOneWidget);
     expect(find.text('Dourado'), findsOneWidget);
 
-    // Vai para a aba Eu.
+    // Aba Eu mostra o usuário real da sessão.
+    await tester.tap(find.text('Eu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pescador Demo'), findsOneWidget);
+    expect(find.text('demo@fishing.local'), findsOneWidget);
+  });
+
+  testWidgets('logout volta ao login', (tester) async {
+    final auth = await _authenticated();
+    final fishClient = MockClient((_) async => http.Response(_pageJson, 200,
+        headers: {'content-type': 'application/json; charset=utf-8'}));
+
+    await tester.pumpWidget(
+      FishingApp(auth: auth, fishService: FishService(client: fishClient)),
+    );
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Eu'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pescador'), findsOneWidget);
-    expect(find.text('Capturas'), findsOneWidget);
-
-    // Volta para o Mapa.
-    await tester.tap(find.text('Mapa'));
+    // "Sair" fica no fim da lista; rola até ele antes de tocar.
+    await tester.scrollUntilVisible(find.text('Sair'), 200);
     await tester.pumpAndSettle();
-    expect(find.text('Pontos de pesca'), findsOneWidget);
+    await tester.tap(find.text('Sair'));
+    await tester.pumpAndSettle();
+
+    // AuthGate troca para a tela de login.
+    expect(auth.status, AuthStatus.unauthenticated);
+    expect(find.text('Bem-vindo de volta'), findsOneWidget);
   });
 }

@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../models/auth_user.dart';
+import '../state/auth_controller.dart';
+import 'edit_profile_screen.dart';
 
-/// Tela "Eu" com o perfil do pescador e suas estatísticas.
+/// Tela "Eu" com o perfil real do pescador, vindo do [AuthController].
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  /// Opcional para manter compatibilidade com testes que montam a aba sem
+  /// sessão; em produção sempre recebe o controller pelo `HomeShell`.
+  final AuthController? auth;
+
+  const ProfileScreen({super.key, this.auth});
 
   @override
   Widget build(BuildContext context) {
+    final controller = auth;
+    if (controller == null) return _buildContent(context, null);
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => _buildContent(context, controller.user),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, AuthUser? user) {
     return Scaffold(
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          _buildHeader(context),
+          _buildHeader(context, user),
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -34,16 +50,31 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.bookmark_border, title: 'Pontos salvos'),
           const SizedBox(height: 12),
           const _SectionTitle('Conta'),
-          const _ProfileTile(
-              icon: Icons.settings_outlined, title: 'Configurações'),
-          const _ProfileTile(icon: Icons.help_outline, title: 'Ajuda'),
+          _ProfileTile(
+            icon: Icons.edit_outlined,
+            title: 'Editar perfil',
+            onTap: auth == null ? null : () => _openEdit(context),
+          ),
+          _ProfileTile(
+            icon: Icons.logout,
+            title: 'Sair',
+            onTap: auth == null ? null : () => auth!.logout(),
+          ),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  void _openEdit(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => EditProfileScreen(auth: auth!)),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, AuthUser? user) {
+    final name = user?.name ?? 'Pescador';
+    final email = user?.email ?? '';
     return Container(
       decoration: const BoxDecoration(
         gradient: AppColors.waterGradient,
@@ -67,7 +98,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: auth == null ? null : () => _openEdit(context),
                     icon: const Icon(Icons.edit_outlined, color: Colors.white),
                   ),
                 ],
@@ -86,18 +117,38 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Pescador',
-                style: TextStyle(
+              Text(
+                name,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Text(
-                'lucasdelazeri1@gmail.com',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
-              ),
+              if (email.isNotEmpty)
+                Text(
+                  email,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
+                ),
+              if (user != null && user.isAdmin) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    user.role.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -164,8 +215,9 @@ class _SectionTitle extends StatelessWidget {
 class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
-  const _ProfileTile({required this.icon, required this.title});
+  const _ProfileTile({required this.icon, required this.title, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +237,7 @@ class _ProfileTile extends StatelessWidget {
           title: Text(title,
               style: const TextStyle(fontWeight: FontWeight.w600)),
           trailing: const Icon(Icons.chevron_right, color: Colors.black26),
-          onTap: () {},
+          onTap: onTap,
         ),
       ),
     );

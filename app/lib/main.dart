@@ -1,10 +1,36 @@
 import 'package:flutter/material.dart';
 
+import 'screens/auth_gate.dart';
 import 'screens/home_shell.dart';
+import 'services/auth_http_client.dart';
 import 'services/fish_service.dart';
+import 'services/mock_data.dart';
+import 'services/water_body_service.dart';
+import 'state/auth_controller.dart';
 
 void main() {
-  runApp(const FishingApp());
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final auth = AuthController();
+
+  // Cliente HTTP autenticado: injeta o Bearer e desloga em 401. Em modo mock
+  // o cliente interno é o simulado, para o app rodar sem backend.
+  final httpClient = AuthHttpClient(
+    tokenProvider: () => auth.token,
+    onUnauthorized: auth.onUnauthorized,
+    inner: FishService.useMock ? createMockClient() : null,
+  );
+  final fishService = FishService(client: httpClient);
+  final waterBodyService = WaterBodyService(client: httpClient);
+
+  // Lê a sessão salva e define o estado inicial (splash -> login/app).
+  auth.bootstrap();
+
+  runApp(FishingApp(
+    auth: auth,
+    fishService: fishService,
+    waterBodyService: waterBodyService,
+  ));
 }
 
 /// Cores base do app, inspiradas em água e natureza.
@@ -24,11 +50,16 @@ class AppColors {
 }
 
 class FishingApp extends StatelessWidget {
-  /// Serviço opcional injetado nos testes; em produção fica nulo e cada
-  /// tela cria a sua própria instância.
+  /// Serviço de catálogo, injetado nos testes e no `main`.
   final FishService? fishService;
 
-  const FishingApp({super.key, this.fishService});
+  /// Serviço do mapa, injetado nos testes e no `main`.
+  final WaterBodyService? waterBodyService;
+
+  /// Sessão do app. Quando presente, o `AuthGate` decide login ↔ app.
+  final AuthController? auth;
+
+  const FishingApp({super.key, this.fishService, this.waterBodyService, this.auth});
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +110,16 @@ class FishingApp extends StatelessWidget {
         ),
         chipTheme: const ChipThemeData(showCheckmark: false),
       ),
-      home: HomeShell(fishService: fishService),
+      home: auth != null
+          ? AuthGate(
+              auth: auth!,
+              fishService: fishService ?? FishService(),
+              waterBodyService: waterBodyService ?? WaterBodyService(),
+            )
+          : HomeShell(
+              fishService: fishService,
+              waterBodyService: waterBodyService,
+            ),
     );
   }
 }

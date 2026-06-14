@@ -2,6 +2,8 @@
 
 API REST do aplicativo de pesca (Univates). Spring Boot 4 + Java 21 + PostgreSQL.
 
+Expõe quatro recursos: **peixes** (`/api/fish`), **corpos d'água** (`/api/water-bodies`), **usuários** (`/api/users`) e **produtos** (`/api/produtos`).
+
 ## Stack
 
 | Camada        | Tecnologia                                         |
@@ -40,7 +42,7 @@ Princípios aplicados:
 - **Erros padronizados (RFC 7807)** — `GlobalExceptionHandler` retorna `ProblemDetail` (padrão Spring 6+).
 - **Schema versionado** — Flyway gerencia migrations; `ddl-auto=validate` em produção.
 - **Auditoria automática** — `@CreatedDate` / `@LastModifiedDate` via JPA Auditing.
-- **Paginação** — `GET /api/produtos` aceita `?page=0&size=20&sort=id`.
+- **Paginação** — os endpoints de listagem aceitam `?page=0&size=20&sort=id`.
 
 ## Pré-requisitos
 
@@ -88,19 +90,72 @@ A UI é renderizada via [Scalar](https://scalar.com/) carregado por CDN. O `Scal
 
 ## Endpoints
 
-Base: `/api/produtos`
+Os três recursos seguem o mesmo padrão CRUD paginado. Parâmetros de paginação: `?page=0&size=20&sort=id,asc`.
 
-| Método | Rota                 | Descrição           | Sucesso |
-|--------|----------------------|---------------------|---------|
-| GET    | `/api/produtos`      | Lista (paginado)    | 200     |
-| GET    | `/api/produtos/{id}` | Busca por id        | 200     |
-| POST   | `/api/produtos`      | Cria                | 201     |
-| PUT    | `/api/produtos/{id}` | Atualiza            | 200     |
-| DELETE | `/api/produtos/{id}` | Remove              | 204     |
+### Peixes — `/api/fish`
 
-Parâmetros de paginação: `?page=0&size=20&sort=id,asc`
+| Método | Rota             | Descrição        | Sucesso |
+|--------|------------------|------------------|---------|
+| GET    | `/api/fish`      | Lista (paginado) | 200     |
+| GET    | `/api/fish/{id}` | Busca por id     | 200     |
+| POST   | `/api/fish`      | Cria             | 201     |
+| PUT    | `/api/fish/{id}` | Atualiza         | 200     |
+| DELETE | `/api/fish/{id}` | Remove           | 204     |
 
-Exemplo de criação:
+```bash
+curl -X POST http://localhost:8080/api/fish \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name":"Tucunaré",
+        "description":"Peixe predador de água doce, popular na pesca esportiva",
+        "region":"Bacia Amazônica",
+        "type":"FRESHWATER",
+        "icon":{"path":"/icons/tucunare.png"}
+      }'
+```
+
+`type` aceita: `FRESHWATER` (água doce), `SALTWATER` (água salgada), `BRACKISH` (água salobra).
+
+### Corpos d'água — `/api/water-bodies`
+
+| Método | Rota                 | Descrição              | Sucesso |
+|--------|----------------------|------------------------|---------|
+| GET    | `/api/water-bodies`  | Lista por viewport     | 200     |
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8080/api/water-bodies?bbox=-51.5,-30.5,-51.0,-30.0"
+```
+
+`bbox` usa formato `minLon,minLat,maxLon,maxLat`. Se omitido, a API usa viewport padrão do RS.
+
+### Usuários — `/api/users`
+
+| Método | Rota              | Descrição        | Sucesso |
+|--------|-------------------|------------------|---------|
+| GET    | `/api/users`      | Lista (paginado) | 200     |
+| GET    | `/api/users/{id}` | Busca por id     | 200     |
+| POST   | `/api/users`      | Cria             | 201     |
+| PUT    | `/api/users/{id}` | Atualiza         | 200     |
+| DELETE | `/api/users/{id}` | Remove           | 204     |
+
+```bash
+curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Smith","email":"john@example.com","password":"password123"}'
+```
+
+E-mail é único (conflito retorna `409`); a senha exige no mínimo 6 caracteres e nunca é devolvida na resposta.
+
+### Produtos — `/api/produtos`
+
+| Método | Rota                 | Descrição        | Sucesso |
+|--------|----------------------|------------------|---------|
+| GET    | `/api/produtos`      | Lista (paginado) | 200     |
+| GET    | `/api/produtos/{id}` | Busca por id     | 200     |
+| POST   | `/api/produtos`      | Cria             | 201     |
+| PUT    | `/api/produtos/{id}` | Atualiza         | 200     |
+| DELETE | `/api/produtos/{id}` | Remove           | 204     |
 
 ```bash
 curl -X POST http://localhost:8080/api/produtos \
@@ -133,9 +188,13 @@ Usam **Testcontainers** — um container Postgres 16 real é levantado automatic
 
 As migrations ficam em `src/main/resources/db/migration/` no padrão `V{n}__{descricao}.sql`.
 
-| Versão | Arquivo                      | Descrição         |
-|--------|------------------------------|-------------------|
-| V1     | `V1__create_produtos.sql`    | Cria tabela produtos |
+| Versão | Arquivo                   | Descrição              |
+|--------|---------------------------|------------------------|
+| V1     | `V1__create_produtos.sql` | Cria tabela `produtos` |
+| V2     | `V2__create_users.sql`    | Cria tabela `users`    |
+| V3     | `V3__create_fish.sql`     | Cria tabela `fish`     |
+| V4     | `V4__seed_fish_rs.sql`   | Seed de espécies RS    |
+| V5     | `V5__enable_postgis_and_water_bodies.sql` | Habilita PostGIS + cria `water_body` |
 
 Em produção, o Hibernate está em modo `validate` — qualquer divergência entre o schema e as entidades gera erro na startup antes de atender requests.
 
@@ -154,10 +213,12 @@ Em produção, copie `.env.example` para `.env` e ajuste `POSTGRES_PASSWORD`. O 
 
 ### Profiles
 
-| Profile | `show-sql` | `health.show-details` | Quando                         |
-|---------|------------|-----------------------|--------------------------------|
-| `dev`   | `true`     | `always`              | default; `./gradlew bootRun`   |
-| `prod`  | `false`    | `when-authorized`     | `docker-compose.prod.yml`      |
+Configuração comum em `application.properties`; cada perfil sobrescreve o que precisa no respectivo arquivo (`application-dev.properties`, `application-prod.properties`).
+
+| Profile | Arquivo                       | `show-sql` | `health.show-details` | Quando                       |
+|---------|-------------------------------|------------|-----------------------|------------------------------|
+| `dev`   | `application-dev.properties`  | `true`     | `always`              | default; `./gradlew bootRun` |
+| `prod`  | `application-prod.properties` | `false`    | `when-authorized`     | `docker-compose.prod.yml`    |
 
 Propriedades fixas relevantes:
 
@@ -173,20 +234,22 @@ Propriedades fixas relevantes:
 backend/
 ├── src/main/java/com/univates/fishing_backend/
 │   ├── FishingBackendApplication.java
-│   ├── config/           # JpaConfig (@EnableJpaAuditing), OpenApiConfig
-│   ├── controller/       # ProdutoController, ScalarController
-│   ├── service/          # ProdutoService
-│   ├── repository/       # ProdutoRepository
-│   ├── entity/           # Produto (JPA + Auditing)
-│   ├── dto/              # ProdutoRequestDTO, ProdutoResponseDTO, ProdutoUpdateDTO (records)
+│   ├── config/           # JpaConfig (@EnableJpaAuditing), OpenApiConfig, FlywayConfig
+│   ├── controller/       # Fish/User/Produto Controller + ScalarController
+│   ├── service/          # FishService, UserService, ProdutoService
+│   ├── repository/       # FishRepository, UserRepository, ProdutoRepository
+│   ├── entity/           # Fish (+ Icon embutido, enum FishType), User, Produto (JPA + Auditing)
+│   ├── dto/              # records de Request/Response/Update + IconDTO
 │   └── exception/        # GlobalExceptionHandler (ProblemDetail), ResourceNotFoundException
 ├── src/main/resources/
-│   ├── application.properties
-│   └── db/migration/     # V1__create_produtos.sql
+│   ├── application.properties        # config comum
+│   ├── application-dev.properties    # perfil dev
+│   ├── application-prod.properties   # perfil prod
+│   └── db/migration/     # V1__create_produtos / V2__create_users / V3__create_fish
 ├── src/test/java/.../
 │   ├── config/           # TestcontainersConfiguration
-│   ├── controller/       # ProdutoControllerTest (@SpringBootTest + Testcontainers)
-│   └── service/          # ProdutoServiceTest (Mockito puro)
+│   ├── controller/       # *ControllerTest (@SpringBootTest + Testcontainers)
+│   └── service/          # *ServiceTest (Mockito puro)
 ├── docker-compose.yml          # infra de dev (Postgres + pgAdmin)
 ├── docker-compose.prod.yml     # stack completo (+ app com healthcheck)
 ├── Dockerfile                  # build de produção (multi-stage)

@@ -4,16 +4,11 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import '../models/fish.dart';
+import 'api_exception.dart';
 import 'mock_data.dart';
 
-/// Erro lançado quando uma chamada ao backend falha.
-class ApiException implements Exception {
-  final String message;
-  const ApiException(this.message);
-
-  @override
-  String toString() => message;
-}
+// Reexportado para compatibilidade com quem importa `ApiException` daqui.
+export 'api_exception.dart';
 
 /// Acesso ao recurso `/api/fish` do backend.
 ///
