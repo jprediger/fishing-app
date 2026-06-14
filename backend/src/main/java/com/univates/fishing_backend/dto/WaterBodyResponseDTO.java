@@ -14,6 +14,7 @@ public record WaterBodyResponseDTO(
     String source,
     Double centerLon,
     Double centerLat,
+    Double distanceMeters,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {}
