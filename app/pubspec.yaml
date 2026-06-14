@@ -42,6 +42,9 @@ dependencies:
   # HTTP client used to talk to the Spring Boot backend.
   http: ^1.6.0
 
+  # Armazenamento seguro do token JWT (Keychain/Keystore/etc.).
+  flutter_secure_storage: ^9.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
