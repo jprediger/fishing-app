@@ -5,20 +5,20 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record UserRequestDTO(
+public record RegisterRequestDTO(
 
-    @Schema(description = "User name", example = "John Smith")
+    @Schema(description = "User name", example = "João Prediger")
     @NotBlank(message = "Name is required")
     String name,
 
-    @Schema(description = "User e-mail", example = "john@example.com")
+    @Schema(description = "E-mail (used as login)", example = "joao@univates.br")
     @NotBlank(message = "E-mail is required")
     @Email(message = "Invalid e-mail")
     String email,
 
-    @Schema(description = "User password", example = "password123")
+    @Schema(description = "Password (min 8 characters)", example = "strongPass123")
     @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @Size(min = 8, message = "Password must be at least 8 characters")
     String password
 
 ) {}

@@ -27,8 +27,14 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /** Hash BCrypt da senha (nunca a senha em texto puro). */
     @Column(nullable = false)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(nullable = false, length = 32)
+    private Role role = Role.USER;
 
     @Builder.Default
     @Column(nullable = false)
