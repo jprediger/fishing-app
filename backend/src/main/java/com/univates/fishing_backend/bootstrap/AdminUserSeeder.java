@@ -10,9 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Garante a existência de um usuário ADMIN inicial em todos os perfis.
+ * Garante a existência de um usuário ADMIN inicial.
  *
- * <p>Credenciais vêm de {@code app.admin.email} / {@code app.admin.password}
+ * <p>Usado pelo bootstrap normal do app e também pelo comando de seed.
+ * Credenciais vêm de {@code app.admin.email} / {@code app.admin.password}
  * (env {@code APP_ADMIN_EMAIL} / {@code APP_ADMIN_PASSWORD}). Em prod não há
  * default — a aplicação falha ao subir se faltarem. Em dev o perfil fornece
  * valores de teste. Idempotente: só cria se o e-mail ainda não existir.

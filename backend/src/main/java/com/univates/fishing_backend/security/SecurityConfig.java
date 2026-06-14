@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration
+@org.springframework.context.annotation.Profile("!seed")
 public class SecurityConfig {
 
     private final String jwtSecret;
@@ -109,11 +110,6 @@ public class SecurityConfig {
     @Bean
     public JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder.withSecretKey(hmacKey()).build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 
     @Bean

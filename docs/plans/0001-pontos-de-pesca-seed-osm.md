@@ -96,11 +96,11 @@ CREATE UNIQUE INDEX uk_water_body_osm ON water_body (osm_id) WHERE osm_id IS NOT
   nova); o mapa carrega após login.
 
 ### 5. Seed — importador OSM via Overpass
-**Abordagem:** importador rodável sob demanda (não SQL gigante commitado —
-geometria de milhares de feições incharia o repositório).
+**Abordagem:** importador rodável sob demanda via comando separado
+(`./gradlew seed`) — não SQL gigante commitado, geometria de milhares de
+feições incharia o repositório.
 
-Implementar como `ApplicationRunner` ativado por flag
-(`--app.seed.water-bodies=true`) que:
+Implementar como `ApplicationRunner` ativado por profile `seed` que:
 1. POST para `https://overpass-api.de/api/interpreter` com:
    ```overpassql
    [out:json][timeout:180];
@@ -135,7 +135,7 @@ Implementar como `ApplicationRunner` ativado por flag
 1. Infra PostGIS (docker) + dependências.
 2. Migration V5.
 3. Entidade + repo + DTO + controller + security.
-4. Importador Overpass (rodar 1x, validar volume/qualidade).
+4. Comando `./gradlew seed` (rodar 1x, validar volume/qualidade).
 5. Integração do front.
 
 ## Critérios de aceite

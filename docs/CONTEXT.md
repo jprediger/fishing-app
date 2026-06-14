@@ -26,8 +26,8 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
   `GET /api/fish` (paginado).
 - **Corpos d'água (`water_body`)**: implementados no backend com PostGIS,
   endpoint `/api/water-bodies` e seed OSM via Overpass. O mapa do app já
-  consome o backend e não usa mais pontos *hardcoded*. → ver
-  [plano 0001](./plans/0001-pontos-de-pesca-seed-osm.md).
+  consome o backend e não usa mais pontos *hardcoded*. O seed roda por comando
+  próprio (`./gradlew seed`). → ver [plano 0001](./plans/0001-pontos-de-pesca-seed-osm.md).
 - **Registro de pesca (`catch_record`)**: feature central planejada — usuário
   registra uma pesca (espécie, fotos, peso/comprimento, método, finalidade,
   clima automático) ligada a um corpo d'água e a um ponto no mapa, com opção de

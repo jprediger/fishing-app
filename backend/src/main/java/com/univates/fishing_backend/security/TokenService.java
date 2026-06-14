@@ -1,6 +1,7 @@
 package com.univates.fishing_backend.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 
 @Service
+@Profile("!seed")
 public class TokenService {
 
     private final JwtEncoder encoder;

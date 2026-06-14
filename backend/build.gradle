@@ -49,3 +49,12 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('seed', JavaExec) {
+	group = 'application'
+	description = 'Roda todos os seeds e encerra.'
+	dependsOn classes
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.univates.fishing_backend.FishingBackendApplication'
+	args '--spring.profiles.active=seed'
+}

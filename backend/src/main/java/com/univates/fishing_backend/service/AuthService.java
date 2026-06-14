@@ -11,6 +11,7 @@ import com.univates.fishing_backend.repository.UserRepository;
 import com.univates.fishing_backend.security.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
+@Profile("!seed")
 @RequiredArgsConstructor
 public class AuthService {
 

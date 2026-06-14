@@ -63,6 +63,17 @@ docker compose up -d
 
 A API sobe em `http://localhost:8080`.
 
+### Seeds
+
+Roda todos os seeds e encerra:
+
+```bash
+./gradlew seed
+```
+
+Esse comando ativa profile `seed`, liga `AdminUserSeeder`, `DemoUserSeeder`,
+`DemoCatalogSeeder` e `OverpassWaterBodySeeder`, sem subir servidor web.
+
 > Hot reload: na IDE (IntelliJ com *Build project automatically*, ou o "Run" do VS Code), salvar um `.java` dispara o restart automático em ~1s. Pelo terminal, rode `./gradlew compileJava` em outro terminal para disparar o reload.
 
 ## Como rodar (stack completo / produção)
