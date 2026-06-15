@@ -26,6 +26,9 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(name = "avatar_path")
+    private String avatarPath;
+
     /** Hash BCrypt da senha (nunca a senha em texto puro). */
     @Column(nullable = false)
     private String password;

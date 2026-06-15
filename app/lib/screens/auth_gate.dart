@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/catch_service.dart';
 import '../services/fish_service.dart';
+import '../services/profile_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
 import 'home_shell.dart';
@@ -14,6 +15,7 @@ class AuthGate extends StatelessWidget {
   final AuthController auth;
   final FishService fishService;
   final CatchService catchService;
+  final ProfileService profileService;
   final WaterBodyService waterBodyService;
 
   const AuthGate({
@@ -21,6 +23,7 @@ class AuthGate extends StatelessWidget {
     required this.auth,
     required this.fishService,
     required this.catchService,
+    required this.profileService,
     required this.waterBodyService,
   });
 
@@ -39,6 +42,7 @@ class AuthGate extends StatelessWidget {
               auth: auth,
               fishService: fishService,
               catchService: catchService,
+              profileService: profileService,
               waterBodyService: waterBodyService,
             );
         }

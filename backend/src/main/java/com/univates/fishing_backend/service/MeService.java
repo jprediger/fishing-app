@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class MeService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CatchPhotoStorageService catchPhotoStorageService;
 
     @Transactional(readOnly = true)
     public UserResponseDTO getByEmail(String email) {
@@ -30,6 +32,29 @@ public class MeService {
             user.setPassword(passwordEncoder.encode(dto.password()));
         }
         return UserResponseDTO.from(userRepository.save(user));
+    }
+
+    public UserResponseDTO updateAvatarByEmail(String email, MultipartFile file) {
+        User user = loadByEmail(email);
+        String previousAvatar = user.getAvatarPath();
+        String stored = catchPhotoStorageService.store(file);
+        user.setAvatarPath(stored);
+        User saved = userRepository.save(user);
+        if (previousAvatar != null && !previousAvatar.isBlank()) {
+            catchPhotoStorageService.delete(previousAvatar);
+        }
+        return UserResponseDTO.from(saved);
+    }
+
+    public UserResponseDTO deleteAvatarByEmail(String email) {
+        User user = loadByEmail(email);
+        String previousAvatar = user.getAvatarPath();
+        user.setAvatarPath(null);
+        User saved = userRepository.save(user);
+        if (previousAvatar != null && !previousAvatar.isBlank()) {
+            catchPhotoStorageService.delete(previousAvatar);
+        }
+        return UserResponseDTO.from(saved);
     }
 
     private User loadByEmail(String email) {

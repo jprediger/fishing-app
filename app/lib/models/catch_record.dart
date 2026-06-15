@@ -107,13 +107,15 @@ class CatchPhoto {
 class CatchAuthor {
   final int id;
   final String name;
+  final String? avatarPath;
 
-  const CatchAuthor({required this.id, required this.name});
+  const CatchAuthor({required this.id, required this.name, this.avatarPath});
 
   factory CatchAuthor.fromJson(Map<String, dynamic> json) {
     return CatchAuthor(
       id: (json['id'] as num).toInt(),
       name: json['name'] as String,
+      avatarPath: json['avatarPath'] as String?,
     );
   }
 }

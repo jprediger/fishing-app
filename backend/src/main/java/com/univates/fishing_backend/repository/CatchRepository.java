@@ -11,11 +11,21 @@ public interface CatchRepository extends JpaRepository<CatchRecord, Long> {
 
     Page<CatchRecord> findByUser_Email(String email, Pageable pageable);
 
+    Page<CatchRecord> findByUser_Id(Long userId, Pageable pageable);
+
     Page<CatchRecord> findBySpecies_Id(Long speciesId, Pageable pageable);
 
     Page<CatchRecord> findByWaterBody_Id(Long waterBodyId, Pageable pageable);
 
     Page<CatchRecord> findByUser_EmailAndSpecies_Id(String email, Long speciesId, Pageable pageable);
+
+    long countByUser_Id(Long userId);
+
+    @Query("select count(distinct c.species.id) from CatchRecord c where c.user.id = :userId")
+    long countDistinctSpeciesByUser_Id(@Param("userId") Long userId);
+
+    @Query("select count(distinct c.waterBody.id) from CatchRecord c where c.user.id = :userId")
+    long countDistinctWaterBodyByUser_Id(@Param("userId") Long userId);
 
     @Query(
             value =

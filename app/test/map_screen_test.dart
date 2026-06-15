@@ -27,8 +27,8 @@ const _waterBodiesJson = '''
     },
     "osmId": 1001,
     "source": "OSM",
-    "centerLon": -51.20,
-    "centerLat": -30.08
+    "centerLon": -51.2645,
+    "centerLat": -30.0846
   }
 ]
 ''';
@@ -246,7 +246,7 @@ void main() {
           client: client,
           baseUrl: 'http://test.local',
         ),
-        debugInitialZoom: 12.5,
+        debugInitialZoom: 15.5,
       ),
     );
 
@@ -501,11 +501,19 @@ void main() {
         .widgetList<MapMarker>(find.byType(MapMarker))
         .toList();
     expect(
-      markers.any((marker) => marker.kind.color == AppColors.markerCatchMine),
+      markers.any(
+        (marker) =>
+            marker.kind == MapMarkerKind.catchRecordMine &&
+            marker.kind.color == AppColors.markerCatchMine,
+      ),
       isTrue,
     );
     expect(
-      markers.any((marker) => marker.kind.color == AppColors.markerCatchOther),
+      markers.any(
+        (marker) =>
+            marker.kind == MapMarkerKind.catchRecord &&
+            marker.kind.color == AppColors.markerCatchOther,
+      ),
       isTrue,
     );
   });
@@ -604,8 +612,8 @@ void main() {
             },
             "osmId": 1001,
             "source": "OSM",
-            "centerLon": -51.20,
-            "centerLat": -30.08,
+            "centerLon": -51.2645,
+            "centerLat": -30.0846,
             "catchCount": 12
           }
         ]
@@ -622,7 +630,7 @@ void main() {
           client: client,
           baseUrl: 'http://test.local',
         ),
-        debugInitialZoom: 12.5,
+        debugInitialZoom: 15.5,
       ),
     );
 
@@ -674,8 +682,8 @@ void main() {
             },
             "osmId": 1001,
             "source": "OSM",
-            "centerLon": -51.20,
-            "centerLat": -30.08,
+            "centerLon": -51.2645,
+            "centerLat": -30.0846,
             "catchCount": 12
           }
         ]
@@ -692,7 +700,7 @@ void main() {
           client: client,
           baseUrl: 'http://test.local',
         ),
-        debugInitialZoom: 12.5,
+        debugInitialZoom: 15.5,
       ),
     );
 

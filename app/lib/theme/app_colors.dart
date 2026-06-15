@@ -18,8 +18,8 @@ class AppColors {
   // marca crua) para que a paleta de marcadores evolua num só lugar. Usadas
   // pelo design system de marcadores (ver `widgets/map_marker.dart`).
   static const Color markerWaterBody = secondary; // corpos d'água
-  static const Color markerCatchMine = Color(0xFF2EC4B6); // pesca própria
-  static const Color markerCatchOther = deep; // pesca de outros
+  static const Color markerCatchMine = deep; // pesca própria
+  static const Color markerCatchOther = Color(0xFF2EC4B6); // pesca de outros
   static const Color markerCatch = markerCatchOther; // alias legado
   static const Color markerEstablishment = sand; // estabelecimentos (futuro)
 

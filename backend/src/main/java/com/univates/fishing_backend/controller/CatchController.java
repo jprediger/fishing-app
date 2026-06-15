@@ -35,8 +35,9 @@ public class CatchController {
             @PageableDefault(size = 20, sort = "id") Pageable pageable,
             @RequestParam(required = false) Long speciesId,
             @RequestParam(required = false) String bbox,
-            @RequestParam(required = false) Long waterBodyId) {
-        return catchService.findAll(pageable, authentication.getName(), speciesId, bbox, waterBodyId);
+            @RequestParam(required = false) Long waterBodyId,
+            @RequestParam(required = false) Long userId) {
+        return catchService.findAll(pageable, authentication.getName(), speciesId, bbox, waterBodyId, userId);
     }
 
     @GetMapping("/mine")

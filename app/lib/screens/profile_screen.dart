@@ -1,86 +1,402 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../main.dart';
-import '../models/auth_user.dart';
+import '../models/catch_record.dart';
+import '../models/user_profile.dart';
+import '../services/api_exception.dart';
+import '../services/auth_http_client.dart';
+import '../services/catch_service.dart';
+import '../services/profile_service.dart';
 import '../state/auth_controller.dart';
+import '../widgets/catch_post_card.dart';
+import 'catch_detail_screen.dart';
 import 'edit_profile_screen.dart';
 
-/// Tela "Eu" com o perfil real do pescador, vindo do [AuthController].
-class ProfileScreen extends StatelessWidget {
-  /// Opcional para manter compatibilidade com testes que montam a aba sem
-  /// sessão; em produção sempre recebe o controller pelo `HomeShell`.
+/// Tela única de perfil: próprio usuário ou perfil de outra pessoa.
+class ProfileScreen extends StatefulWidget {
+  final int? userId;
   final AuthController? auth;
+  final String? authToken;
+  final CatchService? catchService;
+  final ProfileService? profileService;
 
-  const ProfileScreen({super.key, this.auth});
+  const ProfileScreen({
+    super.key,
+    this.userId,
+    this.auth,
+    this.authToken,
+    this.catchService,
+    this.profileService,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final controller = auth;
-    if (controller == null) return _buildContent(context, null);
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) => _buildContent(context, controller.user),
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  static const int _pageSize = 20;
+
+  late final ScrollController _scrollController = ScrollController();
+  late final CatchService _catchService;
+  late final ProfileService _profileService;
+  late final bool _ownsCatchService;
+  late final bool _ownsProfileService;
+
+  final List<CatchRecord> _records = [];
+  UserProfile? _profile;
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+  String? _loadMoreError;
+  int _page = 0;
+
+  String? get _token => widget.auth?.token ?? widget.authToken;
+
+  int? get _effectiveUserId => widget.userId ?? widget.auth?.user?.id;
+
+  bool get _isOwnProfile =>
+      widget.auth != null &&
+      _effectiveUserId != null &&
+      widget.auth?.user?.id == _effectiveUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.catchService != null) {
+      _catchService = widget.catchService!;
+      _ownsCatchService = false;
+    } else {
+      _catchService = CatchService(client: _buildClient());
+      _ownsCatchService = true;
+    }
+    if (widget.profileService != null) {
+      _profileService = widget.profileService!;
+      _ownsProfileService = false;
+    } else {
+      _profileService = ProfileService(client: _buildClient());
+      _ownsProfileService = true;
+    }
+    _scrollController.addListener(_maybeLoadMore);
+    unawaited(_loadInitial());
+  }
+
+  http.Client _buildClient() {
+    return AuthHttpClient(
+      tokenProvider: () => _token,
+      onUnauthorized: widget.auth?.onUnauthorized ?? () {},
     );
   }
 
-  Widget _buildContent(BuildContext context, AuthUser? user) {
-    return Scaffold(
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          _buildHeader(context, user),
-          const SizedBox(height: 20),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _StatCard(label: 'Capturas', value: '0', icon: Icons.set_meal),
-                SizedBox(width: 12),
-                _StatCard(label: 'Pontos', value: '0', icon: Icons.place),
-                SizedBox(width: 12),
-                _StatCard(label: 'Saídas', value: '0', icon: Icons.sailing),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle('Atividade'),
-          const _ProfileTile(
-            icon: Icons.history,
-            title: 'Histórico de pescarias',
-          ),
-          const _ProfileTile(
-            icon: Icons.bookmark_border,
-            title: 'Pontos salvos',
-          ),
-          const SizedBox(height: 12),
-          const _SectionTitle('Conta'),
-          _ProfileTile(
-            icon: Icons.edit_outlined,
-            title: 'Editar perfil',
-            onTap: auth == null ? null : () => _openEdit(context),
-          ),
-          _ProfileTile(
-            icon: Icons.logout,
-            title: 'Sair',
-            onTap: auth == null ? null : () => auth!.logout(),
-          ),
-          const SizedBox(height: 24),
-        ],
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_maybeLoadMore)
+      ..dispose();
+    if (_ownsCatchService) {
+      _catchService.dispose();
+    }
+    if (_ownsProfileService) {
+      _profileService.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
+    final token = _token;
+    final userId = _effectiveUserId;
+    if (token == null || userId == null) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Sessão indisponível.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+      _loadMoreError = null;
+      _page = 0;
+      _hasMore = true;
+      _records.clear();
+    });
+
+    try {
+      final results = await Future.wait([
+        _profileService.fetchProfile(token, userId),
+        _catchService.listByUser(userId: userId, page: 0, size: _pageSize),
+      ]);
+      if (!mounted) return;
+      final profile = results[0] as UserProfile;
+      final page = results[1] as List<CatchRecord>;
+      setState(() {
+        _profile = profile;
+        _records.addAll(page);
+        _loading = false;
+        _hasMore = page.length == _pageSize;
+        _page = 1;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error is ApiException
+            ? error.message
+            : 'Falha ao carregar perfil.';
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final userId = _effectiveUserId;
+    if (_loading ||
+        _loadingMore ||
+        !_hasMore ||
+        _error != null ||
+        _loadMoreError != null ||
+        userId == null) {
+      return;
+    }
+
+    setState(() {
+      _loadingMore = true;
+    });
+
+    try {
+      final page = await _catchService.listByUser(
+        userId: userId,
+        page: _page,
+        size: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _records.addAll(page);
+        _loadingMore = false;
+        _hasMore = page.length == _pageSize;
+        _page += 1;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreError = error is ApiException
+            ? error.message
+            : 'Falha ao carregar mais registros.';
+      });
+    }
+  }
+
+  void _maybeLoadMore() {
+    if (!_scrollController.hasClients || !_hasMore) return;
+    if (_scrollController.position.extentAfter < 420) {
+      unawaited(_loadMore());
+    }
+  }
+
+  Future<void> _retry() => _loadInitial();
+
+  Future<void> _retryMore() async {
+    setState(() => _loadMoreError = null);
+    await _loadMore();
+  }
+
+  void _openRecord(CatchRecord record) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CatchDetailScreen(
+          initialRecord: record,
+          catchService: widget.catchService ?? _catchService,
+          authToken: _token,
+        ),
       ),
     );
   }
 
-  void _openEdit(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => EditProfileScreen(auth: auth!)));
+  void _openEdit() {
+    final auth = widget.auth;
+    if (auth == null) return;
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => EditProfileScreen(auth: auth)))
+        .then((_) {
+          if (mounted) {
+            unawaited(_loadInitial());
+          }
+        });
   }
 
-  Widget _buildHeader(BuildContext context, AuthUser? user) {
-    final name = user?.name ?? 'Pescador';
-    final email = user?.email ?? '';
-    final cs = Theme.of(context).colorScheme;
-    // Brancos intencionais sobre gradiente de marca.
+  @override
+  Widget build(BuildContext context) {
+    final profile = _profile;
+
+    if (_loading && profile == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_error != null && profile == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Perfil')),
+        body: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          children: [
+            FeedStateCard(
+              icon: Icons.error_outline,
+              title: 'Falha ao carregar perfil',
+              message: _error!,
+              actionLabel: 'Tentar novamente',
+              onAction: _retry,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(profile?.name ?? 'Perfil'),
+        actions: _isOwnProfile
+            ? [
+                IconButton(
+                  onPressed: _openEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Editar perfil',
+                ),
+                IconButton(
+                  onPressed: () => widget.auth?.logout(),
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Sair',
+                ),
+              ]
+            : null,
+      ),
+      body: RefreshIndicator(
+        onRefresh: _retry,
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _ProfileHeader(
+                profile: profile,
+                authToken: _token,
+                uploadUrl: profile?.avatarPath == null
+                    ? null
+                    : _catchService.uploadUrl(profile!.avatarPath!),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                child: _StatsRow(profile: profile),
+              ),
+            ),
+            if (_records.isEmpty && !_loadingMore && _loadMoreError == null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: FeedStateCard(
+                      icon: Icons.inbox_outlined,
+                      title: 'Nenhum registro ainda.',
+                      message: _isOwnProfile
+                          ? 'Seu perfil ainda não tem capturas publicadas.'
+                          : 'Essa pessoa ainda não publicou capturas.',
+                      actionLabel: 'Atualizar',
+                      onAction: _retry,
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final isSeparator = index.isOdd;
+                      final itemIndex = index ~/ 2;
+                      final hasTrailingWidget =
+                          _loadingMore || _loadMoreError != null;
+
+                      if (isSeparator) {
+                        if (itemIndex >= _records.length - 1 &&
+                            !hasTrailingWidget) {
+                          return const SizedBox.shrink();
+                        }
+                        return const SizedBox(height: 12);
+                      }
+
+                      if (itemIndex >= _records.length) {
+                        if (_loadMoreError != null) {
+                          return FeedStateCard(
+                            icon: Icons.sync_problem,
+                            title: 'Falha ao carregar mais registros',
+                            message: _loadMoreError!,
+                            actionLabel: 'Tentar novamente',
+                            onAction: _retryMore,
+                          );
+                        }
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
+                      final record = _records[itemIndex];
+                      return CatchPostCard(
+                        record: record,
+                        authToken: _token,
+                        uploadUrl: record.photos.isEmpty
+                            ? null
+                            : _catchService.uploadUrl(
+                                record.photos.first.filePath,
+                              ),
+                        showAuthor: false,
+                        onTap: () => _openRecord(record),
+                      );
+                    },
+                    childCount:
+                        _records.isEmpty &&
+                            (_loadingMore || _loadMoreError != null)
+                        ? 1
+                        : _records.length * 2 -
+                              1 +
+                              (_loadingMore || _loadMoreError != null ? 1 : 0),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  final UserProfile? profile;
+  final String? uploadUrl;
+  final String? authToken;
+
+  const _ProfileHeader({
+    required this.profile,
+    required this.uploadUrl,
+    required this.authToken,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile?.name ?? 'Pescador';
+    final role = profile?.role.label ?? '';
+    final memberSince = profile?.memberSince == null
+        ? null
+        : _formatDate(profile!.memberSince!);
+
     return Container(
       decoration: const BoxDecoration(
         gradient: AppColors.waterGradient,
@@ -92,39 +408,13 @@ class ProfileScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Meu perfil',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: auth == null ? null : () => _openEdit(context),
-                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.25),
                 ),
-                child: CircleAvatar(
-                  radius: 44,
-                  backgroundColor: cs.surface,
-                  child: const Icon(
-                    Icons.person,
-                    size: 52,
-                    color: AppColors.primary,
-                  ),
-                ),
+                child: _Avatar(uploadUrl: uploadUrl, authToken: authToken),
               ),
               const SizedBox(height: 12),
               Text(
@@ -135,12 +425,7 @@ class ProfileScreen extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              if (email.isNotEmpty)
-                Text(
-                  email,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
-                ),
-              if (user != null && user.isAdmin) ...[
+              if (role.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -152,7 +437,7 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    user.role.label,
+                    role,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -161,10 +446,98 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
+              if (memberSince != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Pescando desde $memberSince',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String? uploadUrl;
+  final String? authToken;
+
+  const _Avatar({required this.uploadUrl, required this.authToken});
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppColors.waterGradient,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.28),
+          width: 2,
+        ),
+      ),
+    );
+
+    if (uploadUrl == null) {
+      return placeholder;
+    }
+
+    return ClipOval(
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: Image.network(
+          uploadUrl!,
+          headers: authToken == null
+              ? null
+              : {'Authorization': 'Bearer $authToken'},
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return placeholder;
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsRow extends StatelessWidget {
+  final UserProfile? profile;
+
+  const _StatsRow({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            label: 'Capturas',
+            value: '${profile?.catchCount ?? 0}',
+            icon: Icons.set_meal,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            label: 'Espécies',
+            value: '${profile?.speciesCount ?? 0}',
+            icon: Icons.spa,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            label: "Corpos d'água",
+            value: '${profile?.waterBodyCount ?? 0}',
+            icon: Icons.water,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -183,87 +556,30 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Column(
-            children: [
-              Icon(icon, color: AppColors.primary),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  const _SectionTitle(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: cs.onSurfaceVariant,
-          letterSpacing: 0.4,
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final VoidCallback? onTap;
-
-  const _ProfileTile({required this.icon, required this.title, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        child: ListTile(
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              // brand accent stays fixed; surface text follows theme.
-              borderRadius: BorderRadius.circular(10),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-          onTap: onTap,
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+String _formatDate(DateTime value) {
+  final local = value.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
 }

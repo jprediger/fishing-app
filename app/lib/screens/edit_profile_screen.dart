@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../config/api_config.dart';
 import '../main.dart';
 import '../state/auth_controller.dart';
 import 'auth_widgets.dart';
@@ -50,6 +52,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickAvatar() async {
+    widget.auth.clearError();
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (file == null) return;
+
+    final ok = await widget.auth.updateAvatar(file);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto de perfil atualizada.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -62,6 +82,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         listenable: widget.auth,
         builder: (context, _) {
           final busy = widget.auth.busy;
+          final user = widget.auth.user;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Form(
@@ -69,6 +90,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Center(
+                    child: Column(
+                      children: [
+                        _AvatarPreview(
+                          avatarPath: user?.avatarPath,
+                          token: widget.auth.token,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : _pickAvatar,
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Trocar foto'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   AuthTextField(
                     controller: _name,
                     label: 'Nome',
@@ -120,5 +158,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         },
       ),
     );
+  }
+}
+
+class _AvatarPreview extends StatelessWidget {
+  final String? avatarPath;
+  final String? token;
+
+  const _AvatarPreview({required this.avatarPath, required this.token});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final placeholder = Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppColors.waterGradient,
+        border: Border.all(color: cs.surfaceContainerHighest, width: 2),
+      ),
+    );
+
+    if (avatarPath == null || avatarPath!.isEmpty) {
+      return placeholder;
+    }
+
+    return ClipOval(
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: Image.network(
+          _avatarUrl(avatarPath!),
+          headers: token == null ? null : {'Authorization': 'Bearer $token'},
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => placeholder,
+        ),
+      ),
+    );
+  }
+
+  String _avatarUrl(String relativePath) {
+    final sanitized = relativePath.startsWith('/')
+        ? relativePath.substring(1)
+        : relativePath;
+    return '${ApiConfig.baseUrl}/uploads/$sanitized';
   }
 }

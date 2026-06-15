@@ -21,12 +21,14 @@ class AuthUser {
   final int id;
   final String name;
   final String email;
+  final String? avatarPath;
   final UserRole role;
 
   const AuthUser({
     required this.id,
     required this.name,
     required this.email,
+    this.avatarPath,
     required this.role,
   });
 
@@ -37,6 +39,7 @@ class AuthUser {
       id: json['id'] as int,
       name: json['name'] as String,
       email: json['email'] as String,
+      avatarPath: json['avatarPath'] as String?,
       role: UserRole.fromApi(json['role'] as String?),
     );
   }
@@ -45,6 +48,7 @@ class AuthUser {
     'id': id,
     'name': name,
     'email': email,
+    'avatarPath': avatarPath,
     'role': role.apiValue,
   };
 }

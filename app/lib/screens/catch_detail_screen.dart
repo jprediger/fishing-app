@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/catch_record.dart';
 import '../services/catch_service.dart';
 import '../services/fish_service.dart';
+import '../theme/app_colors.dart';
 import 'catch_form_screen.dart';
+import 'profile_screen.dart';
 
 class CatchDetailScreen extends StatefulWidget {
   final int? catchId;
@@ -177,6 +179,33 @@ class _CatchDetailScreenState extends State<CatchDetailScreen> {
                     if (record.mine) const Chip(label: Text('Meu registro')),
                   ],
                 ),
+                if (record.author != null) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    child: ListTile(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ProfileScreen(
+                            userId: record.author!.id,
+                            authToken: widget.authToken,
+                            catchService: widget.catchService,
+                          ),
+                        ),
+                      ),
+                      leading: _AuthorAvatar(
+                        avatarUrl: record.author?.avatarPath == null
+                            ? null
+                            : _service.uploadUrl(record.author!.avatarPath!),
+                        authToken: widget.authToken,
+                      ),
+                      title: Text(
+                        record.mine ? 'Você' : record.author!.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text('Abrir perfil'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _SectionCard(
                   title: 'Detalhes',
@@ -298,6 +327,46 @@ class _CatchDetailScreenState extends State<CatchDetailScreen> {
   String _formatDate(DateTime value) {
     final local = value.toLocal();
     return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+}
+
+class _AuthorAvatar extends StatelessWidget {
+  final String? avatarUrl;
+  final String? authToken;
+
+  const _AuthorAvatar({required this.avatarUrl, required this.authToken});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fallback = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppColors.waterGradient,
+        border: Border.all(color: cs.surfaceContainerHighest),
+      ),
+    );
+
+    if (avatarUrl == null || avatarUrl!.isEmpty) {
+      return fallback;
+    }
+
+    return ClipOval(
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Image.network(
+          avatarUrl!,
+          headers: authToken == null
+              ? null
+              : {'Authorization': 'Bearer $authToken'},
+          fit: BoxFit.cover,
+          errorBuilder: (_, error, stackTrace) => fallback,
+        ),
+      ),
+    );
   }
 }
 

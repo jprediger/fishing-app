@@ -117,8 +117,11 @@ void main() {
         MockClient((req) async {
           expect(req.url.path, '/api/users/me');
           authHeader = req.headers['Authorization'] ?? '';
+          final user = Map<String, dynamic>.from(
+            _loginBody['user'] as Map<String, dynamic>,
+          )..['avatarPath'] = 'avatars/admin.webp';
           return http.Response(
-            jsonEncode(_loginBody['user']),
+            jsonEncode(user),
             200,
             headers: {'content-type': 'application/json; charset=utf-8'},
           );
@@ -128,6 +131,7 @@ void main() {
       final user = await service.me('jwt-123');
       expect(authHeader, 'Bearer jwt-123');
       expect(user.email, 'admin@fishing.local');
+      expect(user.avatarPath, 'avatars/admin.webp');
     });
 
     test('updateMe envia name e password quando informados', () async {

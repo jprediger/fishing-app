@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -7,7 +9,9 @@ import '../models/catch_record.dart';
 import '../models/water_body.dart';
 import '../services/catch_service.dart';
 import '../services/fish_service.dart';
+import '../widgets/catch_post_card.dart';
 import 'catch_detail_screen.dart';
+import 'profile_screen.dart';
 
 class CatchFeedScreen extends StatefulWidget {
   final WaterBody body;
@@ -158,6 +162,20 @@ class _CatchFeedScreenState extends State<CatchFeedScreen> {
     );
   }
 
+  void _openAuthorProfile(CatchRecord record) {
+    final author = record.author;
+    if (author == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(
+          userId: author.id,
+          authToken: widget.authToken,
+          catchService: widget.catchService ?? _service,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -177,7 +195,7 @@ class _CatchFeedScreenState extends State<CatchFeedScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
         children: [
-          _FeedStateCard(
+          FeedStateCard(
             icon: Icons.error_outline,
             title: 'Falha ao carregar feed',
             message: _error!,
@@ -193,7 +211,7 @@ class _CatchFeedScreenState extends State<CatchFeedScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
         children: [
-          _FeedStateCard(
+          FeedStateCard(
             icon: Icons.inbox_outlined,
             title: 'Nenhum registro neste corpo d\'água ainda.',
             message: 'Seja o primeiro a postar uma captura aqui.',
@@ -214,7 +232,7 @@ class _CatchFeedScreenState extends State<CatchFeedScreen> {
       itemBuilder: (context, index) {
         if (index >= _records.length) {
           if (_loadMoreError != null) {
-            return _FeedStateCard(
+            return FeedStateCard(
               icon: Icons.sync_problem,
               title: 'Falha ao carregar mais registros',
               message: _loadMoreError!,
@@ -229,13 +247,19 @@ class _CatchFeedScreenState extends State<CatchFeedScreen> {
         }
 
         final record = _records[index];
-        return _CatchPostCard(
+        return CatchPostCard(
           record: record,
           authToken: widget.authToken,
           uploadUrl: record.photos.isEmpty
               ? null
               : _service.uploadUrl(record.photos.first.filePath),
+          authorAvatarUrl: record.author?.avatarPath == null
+              ? null
+              : _service.uploadUrl(record.author!.avatarPath!),
           onTap: () => _openRecord(record),
+          onAuthorTap: record.author == null
+              ? null
+              : () => _openAuthorProfile(record),
         );
       },
     );

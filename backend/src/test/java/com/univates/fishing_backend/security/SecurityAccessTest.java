@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -37,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -125,6 +127,15 @@ class SecurityAccessTest {
     }
 
     @Test
+    @WithMockUser(username = "demo@fishing.local", roles = "USER")
+    void uploadOwnAvatar_asUser_returns200() throws Exception {
+        when(meService.updateAvatarByEmail(anyString(), any())).thenReturn(sampleUser());
+        MockMultipartFile file =
+                new MockMultipartFile("file", "avatar.png", MediaType.IMAGE_PNG_VALUE, new byte[] {1, 2, 3});
+        mockMvc.perform(multipart("/api/users/me/avatar").file(file)).andExpect(status().isOk());
+    }
+
+    @Test
     void login_isPublic() throws Exception {
         when(authService.login(any())).thenReturn(LoginResponseDTO.bearer("TOKEN", 604800, sampleUser()));
         mockMvc.perform(post("/auth/login")
@@ -148,13 +159,13 @@ class SecurityAccessTest {
     }
 
     private UserResponseDTO sampleUser() {
-        return new UserResponseDTO(1L, "Demo", "demo@fishing.local", Role.USER, true, OffsetDateTime.now(), null);
+        return new UserResponseDTO(1L, "Demo", "demo@fishing.local", null, Role.USER, true, OffsetDateTime.now(), null);
     }
 
     private CatchResponseDTO sampleCatch() {
         return new CatchResponseDTO(
                 1L,
-                new com.univates.fishing_backend.dto.AuthorDTO(1L, "Demo"),
+                new com.univates.fishing_backend.dto.AuthorDTO(1L, "Demo", "avatars/demo.webp"),
                 sampleFish(),
                 sampleWaterBody(),
                 new LocationDTO(-30.0, -51.0),

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/auth_session.dart';
 import '../models/auth_user.dart';
@@ -92,6 +93,17 @@ class AuthController extends ChangeNotifier {
         name: name,
         password: password,
       );
+      _session = _session!.copyWith(user: user);
+      await _storage.saveUser(user);
+    });
+  }
+
+  /// Atualiza avatar do usuário logado.
+  Future<bool> updateAvatar(XFile file) {
+    return _run(() async {
+      final token = _session?.token;
+      if (token == null) throw const ApiException('Sessão expirada.');
+      final user = await _authService.updateAvatar(token, file);
       _session = _session!.copyWith(user: user);
       await _storage.saveUser(user);
     });

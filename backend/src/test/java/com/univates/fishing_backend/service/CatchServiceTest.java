@@ -75,6 +75,7 @@ class CatchServiceTest {
         assertThat(result.author()).isNotNull();
         assertThat(result.author().id()).isEqualTo(10L);
         assertThat(result.author().name()).isEqualTo("Demo");
+        assertThat(result.author().avatarPath()).isEqualTo("avatars/demo.webp");
         assertThat(result.location()).isNotNull();
         assertThat(result.location().lat()).isEqualTo(-30.0);
         assertThat(result.waterBody().id()).isEqualTo(2L);
@@ -156,12 +157,28 @@ class CatchServiceTest {
                         List.of(sampleRecord(LocationVisibility.EXACT, "owner@fishing.local"))));
 
         var result = catchService.findAll(
-                org.springframework.data.domain.PageRequest.of(0, 20), "demo@fishing.local", null, null, 2L);
+                org.springframework.data.domain.PageRequest.of(0, 20), "demo@fishing.local", null, null, 2L, null);
 
         assertThat(result).hasSize(1);
         ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
                 ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
         verify(catchRepository).findByWaterBody_Id(eq(2L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    @Test
+    void findAll_withUserId_filtersByUserAndSortsNewestFirst() {
+        when(catchRepository.findByUser_Id(eq(10L), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(sampleRecord(LocationVisibility.EXACT, "owner@fishing.local"))));
+
+        var result = catchService.findAll(
+                org.springframework.data.domain.PageRequest.of(0, 20), "demo@fishing.local", null, null, null, 10L);
+
+        assertThat(result).hasSize(1);
+        org.mockito.ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(catchRepository).findByUser_Id(eq(10L), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
@@ -188,6 +205,7 @@ class CatchServiceTest {
                 .id(10L)
                 .name("Demo")
                 .email(email)
+                .avatarPath("avatars/demo.webp")
                 .active(true)
                 .role(Role.USER)
                 .build();

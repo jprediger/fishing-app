@@ -91,6 +91,26 @@ class CatchService {
     return _decodePage(response);
   }
 
+  Future<List<CatchRecord>> listByUser({
+    required int userId,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final queryParameters = <String, String>{
+      'page': '$page',
+      'size': '$size',
+      'userId': '$userId',
+      'sort': 'createdAt,desc',
+    };
+
+    final response = await _get(
+      '/api/catches',
+      queryParameters: queryParameters,
+    );
+
+    return _decodePage(response);
+  }
+
   Future<List<CatchRecord>> mine({
     String? bbox,
     int? speciesId,

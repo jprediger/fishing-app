@@ -34,9 +34,14 @@ Map<String, dynamic> _catchJson({
   required String species,
   required bool mine,
   required String authorName,
+  required String? authorAvatarPath,
 }) => {
   'id': id,
-  'author': {'id': mine ? 10 : 11, 'name': authorName},
+  'author': {
+    'id': mine ? 10 : 11,
+    'name': authorName,
+    'avatarPath': authorAvatarPath,
+  },
   'species': _speciesJson(species),
   'waterBody': _waterBodyJson(),
   'location': {'lat': -30.08, 'lon': -51.2},
@@ -72,6 +77,7 @@ void main() {
               species: 'Tucunaré',
               mine: true,
               authorName: 'Eu',
+              authorAvatarPath: 'avatars/eu.webp',
             ),
           ],
         }),
@@ -93,6 +99,14 @@ void main() {
 
     expect(find.text('Tucunaré'), findsOneWidget);
     expect(find.text('Você'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.image, isA<NetworkImage>());
+    expect(
+      (image.image as NetworkImage).url,
+      'http://test.local/uploads/avatars/eu.webp',
+    );
 
     await tester.tap(find.text('Tucunaré'));
     await tester.pumpAndSettle();
@@ -116,6 +130,9 @@ void main() {
                 species: index == 0 ? 'Tucunaré' : 'Bagre',
                 mine: index == 0,
                 authorName: index == 0 ? 'Eu' : 'Outro',
+                authorAvatarPath: index == 0
+                    ? 'avatars/eu.webp'
+                    : 'avatars/outro.webp',
               ),
             ),
           }),
@@ -133,6 +150,7 @@ void main() {
               species: 'Dourado',
               mine: false,
               authorName: 'Outro',
+              authorAvatarPath: 'avatars/outro.webp',
             ),
           ],
         }),

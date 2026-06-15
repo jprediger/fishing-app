@@ -37,20 +37,30 @@ public class CatchService {
 
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findAll(Pageable pageable, String requesterEmail, Long speciesId) {
-        Page<CatchRecord> page = speciesId == null
-                ? catchRepository.findAll(pageable)
-                : catchRepository.findBySpecies_Id(speciesId, pageable);
-        return page.map(record -> toDto(record, requesterEmail));
+        return findAll(pageable, requesterEmail, speciesId, null, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findAll(Pageable pageable, String requesterEmail, Long speciesId, String bbox) {
-        return findAll(pageable, requesterEmail, speciesId, bbox, null);
+        return findAll(pageable, requesterEmail, speciesId, bbox, null, null);
     }
 
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findAll(
             Pageable pageable, String requesterEmail, Long speciesId, String bbox, Long waterBodyId) {
+        return findAll(pageable, requesterEmail, speciesId, bbox, waterBodyId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CatchResponseDTO> findAll(
+            Pageable pageable, String requesterEmail, Long speciesId, String bbox, Long waterBodyId, Long userId) {
+        if (userId != null) {
+            Pageable feedPageable = PageRequest.of(
+                    pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+            Page<CatchRecord> page = catchRepository.findByUser_Id(userId, feedPageable);
+            return page.map(record -> toDto(record, requesterEmail));
+        }
+
         if (waterBodyId != null) {
             Pageable feedPageable = PageRequest.of(
                     pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -59,7 +69,10 @@ public class CatchService {
         }
 
         if (bbox == null || bbox.isBlank()) {
-            return findAll(pageable, requesterEmail, speciesId);
+            Page<CatchRecord> page = speciesId == null
+                    ? catchRepository.findAll(pageable)
+                    : catchRepository.findBySpecies_Id(speciesId, pageable);
+            return page.map(record -> toDto(record, requesterEmail));
         }
 
         Bbox viewport = Bbox.parse(bbox);
@@ -201,7 +214,7 @@ public class CatchService {
 
     private AuthorDTO toAuthorDto(User user) {
         if (user == null) return null;
-        return new AuthorDTO(user.getId(), user.getName());
+        return new AuthorDTO(user.getId(), user.getName(), user.getAvatarPath());
     }
 
     private boolean isOwner(CatchRecord record, String requesterEmail) {

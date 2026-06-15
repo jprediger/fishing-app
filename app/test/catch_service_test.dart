@@ -123,6 +123,29 @@ void main() {
     expect(list.first.id, 99);
   });
 
+  test('lista feed por usuário com sort createdAt desc', () async {
+    final client = MockClient((request) async {
+      expect(request.url.path, '/api/catches');
+      expect(request.url.queryParameters['page'], '2');
+      expect(request.url.queryParameters['size'], '20');
+      expect(request.url.queryParameters['userId'], '7');
+      expect(request.url.queryParameters['sort'], 'createdAt,desc');
+      return http.Response(
+        jsonEncode({
+          'content': [jsonDecode(_createResponse)],
+        }),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+
+    final service = CatchService(client: client, baseUrl: 'http://test.local');
+    final list = await service.listByUser(userId: 7, page: 2);
+
+    expect(list, hasLength(1));
+    expect(list.first.id, 99);
+  });
+
   test('sobe fotos como multipart depois do create', () async {
     final client = MockClient((request) async {
       expect(request.method, 'POST');

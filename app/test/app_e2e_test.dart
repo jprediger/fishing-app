@@ -15,7 +15,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile_app/main.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/catch_service.dart';
 import 'package:mobile_app/services/fish_service.dart';
+import 'package:mobile_app/services/profile_service.dart';
 import 'package:mobile_app/services/token_storage.dart';
 import 'package:mobile_app/services/water_body_service.dart';
 import 'package:mobile_app/state/auth_controller.dart';
@@ -50,6 +52,26 @@ const _waterBodiesJson = '''
     "centerLat": -30.08
   }
 ]
+''';
+
+const _profileJson = '''
+{
+  "id": 2,
+  "name": "Pescador Demo",
+  "role": "USER",
+  "memberSince": "2026-06-01T00:00:00Z",
+  "catchCount": 3,
+  "speciesCount": 2,
+  "waterBodyCount": 1
+}
+''';
+
+const _catchPageJson = '''
+{
+  "content": [],
+  "totalElements": 0,
+  "totalPages": 0
+}
 ''';
 
 const _loginBody = {
@@ -87,27 +109,58 @@ void main() {
     tester,
   ) async {
     final auth = await _authenticated();
-    final fishClient = MockClient(
-      (_) async => http.Response(
-        _pageJson,
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      ),
-    );
-    final waterClient = MockClient((request) async {
-      expect(request.url.path, '/api/water-bodies');
-      return http.Response(
-        _waterBodiesJson,
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      );
+    final appClient = MockClient((request) async {
+      if (request.url.path == '/api/fish') {
+        return http.Response(
+          _pageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/water-bodies') {
+        return http.Response(
+          _waterBodiesJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/users/2') {
+        return http.Response(
+          _profileJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/catches' &&
+          request.url.queryParameters['userId'] == '2') {
+        return http.Response(
+          _catchPageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/catches') {
+        return http.Response(
+          _catchPageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      return http.Response('', 404);
     });
 
     await tester.pumpWidget(
       FishingApp(
         auth: auth,
-        fishService: FishService(client: fishClient),
-        waterBodyService: WaterBodyService(client: waterClient),
+        fishService: FishService(client: appClient),
+        catchService: CatchService(client: appClient),
+        profileService: ProfileService(client: appClient),
+        waterBodyService: WaterBodyService(client: appClient),
       ),
     );
     await tester.pumpAndSettle();
@@ -125,33 +178,64 @@ void main() {
     // Aba Eu mostra o usuário real da sessão.
     await tester.tap(find.text('Eu'));
     await tester.pumpAndSettle();
-    expect(find.text('Pescador Demo'), findsOneWidget);
-    expect(find.text('demo@fishing.local'), findsOneWidget);
+    expect(find.text('Pescador Demo'), findsWidgets);
+    expect(find.textContaining('Pescando desde'), findsWidgets);
   });
 
   testWidgets('logout volta ao login', (tester) async {
     final auth = await _authenticated();
-    final fishClient = MockClient(
-      (_) async => http.Response(
-        _pageJson,
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      ),
-    );
-    final waterClient = MockClient((request) async {
-      expect(request.url.path, '/api/water-bodies');
-      return http.Response(
-        _waterBodiesJson,
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      );
+    final appClient = MockClient((request) async {
+      if (request.url.path == '/api/fish') {
+        return http.Response(
+          _pageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/water-bodies') {
+        return http.Response(
+          _waterBodiesJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/users/2') {
+        return http.Response(
+          _profileJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/catches' &&
+          request.url.queryParameters['userId'] == '2') {
+        return http.Response(
+          _catchPageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      if (request.url.path == '/api/catches') {
+        return http.Response(
+          _catchPageJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      return http.Response('', 404);
     });
 
     await tester.pumpWidget(
       FishingApp(
         auth: auth,
-        fishService: FishService(client: fishClient),
-        waterBodyService: WaterBodyService(client: waterClient),
+        fishService: FishService(client: appClient),
+        catchService: CatchService(client: appClient),
+        profileService: ProfileService(client: appClient),
+        waterBodyService: WaterBodyService(client: appClient),
       ),
     );
     await tester.pumpAndSettle();
@@ -159,10 +243,7 @@ void main() {
     await tester.tap(find.text('Eu'));
     await tester.pumpAndSettle();
 
-    // "Sair" fica no fim da lista; rola até ele antes de tocar.
-    await tester.scrollUntilVisible(find.text('Sair'), 200);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sair'));
+    await tester.tap(find.byIcon(Icons.logout));
     await tester.pumpAndSettle();
 
     // AuthGate troca para a tela de login.

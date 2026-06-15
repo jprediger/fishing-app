@@ -9,6 +9,7 @@ import 'screens/home_shell.dart';
 import 'services/auth_http_client.dart';
 import 'services/catch_service.dart';
 import 'services/fish_service.dart';
+import 'services/profile_service.dart';
 import 'services/water_body_service.dart';
 import 'state/auth_controller.dart';
 import 'theme/app_theme.dart';
@@ -39,6 +40,7 @@ void main() {
   );
   final fishService = FishService(client: httpClient);
   final catchService = CatchService(client: httpClient);
+  final profileService = ProfileService(client: httpClient);
   final waterBodyService = WaterBodyService(client: httpClient);
 
   // Lê a sessão salva e define o estado inicial (splash -> login/app).
@@ -49,6 +51,7 @@ void main() {
       auth: auth,
       fishService: fishService,
       catchService: catchService,
+      profileService: profileService,
       waterBodyService: waterBodyService,
     ),
   );
@@ -61,6 +64,9 @@ class FishingApp extends StatelessWidget {
   /// Serviço de catches, injetado nos testes e no `main`.
   final CatchService? catchService;
 
+  /// Serviço de perfil, injetado nos testes e no `main`.
+  final ProfileService? profileService;
+
   /// Serviço do mapa, injetado nos testes e no `main`.
   final WaterBodyService? waterBodyService;
 
@@ -71,6 +77,7 @@ class FishingApp extends StatelessWidget {
     super.key,
     this.fishService,
     this.catchService,
+    this.profileService,
     this.waterBodyService,
     this.auth,
   });
@@ -88,11 +95,13 @@ class FishingApp extends StatelessWidget {
               auth: auth!,
               fishService: fishService ?? FishService(),
               catchService: catchService ?? CatchService(),
+              profileService: profileService ?? ProfileService(),
               waterBodyService: waterBodyService ?? WaterBodyService(),
             )
           : HomeShell(
               fishService: fishService,
               catchService: catchService,
+              profileService: profileService,
               waterBodyService: waterBodyService,
             ),
     );

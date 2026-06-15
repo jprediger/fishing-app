@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../config/api_config.dart';
 import '../models/auth_session.dart';
@@ -142,6 +143,37 @@ class AuthService {
     );
   }
 
+  /// Atualiza avatar do usuário autenticado.
+  Future<AuthUser> updateAvatar(String token, XFile file) async {
+    final uri = Uri.parse('$_baseUrl/api/users/me/avatar');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Accept'] = 'application/json'
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          await file.readAsBytes(),
+          filename: file.name,
+        ),
+      );
+
+    final response = await _sendMultipart(request);
+    if (response.statusCode == 200) return AuthUser.fromJson(_decode(response));
+    if (response.statusCode == 401) {
+      throw const ApiException('Sessão expirada.', statusCode: 401);
+    }
+    if (response.statusCode == 400) {
+      throw const ApiException(
+        'Dados inválidos. Verifique os campos.',
+        statusCode: 400,
+      );
+    }
+    throw ApiException(
+      'Erro ao atualizar avatar (${response.statusCode}).',
+      statusCode: response.statusCode,
+    );
+  }
+
   Future<http.Response> _post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('$_baseUrl$path');
     try {
@@ -164,6 +196,17 @@ class AuthService {
       throw const ApiException('Resposta inesperada do servidor.');
     }
     return decoded;
+  }
+
+  Future<http.Response> _sendMultipart(http.MultipartRequest request) async {
+    try {
+      final streamed = await _client.send(request);
+      return http.Response.fromStream(streamed);
+    } catch (_) {
+      throw ApiException(
+        'Não foi possível conectar ao servidor em ${request.url}.',
+      );
+    }
   }
 
   void dispose() {

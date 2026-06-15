@@ -57,7 +57,7 @@ public class SecurityConfig {
                         .permitAll()
                         // Self-service do próprio usuário: qualquer autenticado edita o seu /me.
                         // Precisa vir ANTES das regras de escrita em /api/** (que exigem ADMIN).
-                        .requestMatchers("/api/users/me")
+                        .requestMatchers("/api/users/me", "/api/users/me/**")
                         .authenticated()
                         .requestMatchers("/api/catches/**")
                         .authenticated()

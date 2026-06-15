@@ -49,14 +49,22 @@ enum _NearestStatus { idle, loading, found, notFound, error }
 
 class _MapScreenState extends State<MapScreen> {
   static const LatLng _initialCenter = LatLng(-30.0846, -51.2645);
-  static const double _initialZoom = 10.7;
-  static const double _minViewportZoom = 9.0;
+  static const double _initialZoom = 11.5;
+
+  /// Abaixo deste zoom nenhum corpo d'água é carregado/renderizado — em visão
+  /// regional a tela fica limpa. Acima, a geometria passa a aparecer.
+  static const double _minViewportZoom = 11.0;
 
   /// Acima deste zoom os pins dos corpos d'água aparecem. Abaixo, só a
   /// geometria (linhas/polígonos) fica visível para não poluir a tela.
-  static const double _markerMinZoom = 12.0;
+  static const double _markerMinZoom = 15.0;
 
   static const double _viewportPadding = 0.2;
+
+  /// Folga aplicada à viewport visível ao decidir quais corpos desenhar
+  /// (culling). Mantém corpos junto às bordas visíveis enquanto o usuário
+  /// arrasta, evitando "pop-in" no limite da tela.
+  static const double _cullPadding = 0.15;
 
   final MapController _mapController = MapController();
   final CancellableNetworkTileProvider _tileProvider =
@@ -78,6 +86,15 @@ class _MapScreenState extends State<MapScreen> {
   String? _error;
   String? _nearestError;
   _Bbox? _loadedViewport;
+  int? _loadedZoom;
+
+  /// Viewport visível atual, usada para o culling client-side. Atualizada a
+  /// cada movimento de câmera (com limiar para não rebuildar a cada pixel).
+  LatLngBounds? _visibleBounds;
+
+  /// Cache de bounding box por corpo (id -> bbox), evitando recalcular a
+  /// extensão da geometria a cada rebuild durante o culling.
+  final Map<int, _Bbox> _bodyBoundsCache = {};
   LatLng? _draftPoint;
   WaterBody? _nearestBody;
   _NearestStatus _nearestStatus = _NearestStatus.idle;
@@ -104,17 +121,43 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onMapReady() {
     if (!mounted) return;
-    _syncCameraZoom(_mapController.camera.zoom);
+    _syncCamera(_mapController.camera);
     _scheduleViewportLoad(_mapController.camera, force: true);
   }
 
-  void _syncCameraZoom(double zoom) {
-    if (!mounted || (zoom - _cameraZoom).abs() < 0.01) return;
-    setState(() => _cameraZoom = zoom);
+  /// Sincroniza zoom e viewport visível com a câmera. Dispara rebuild (e novo
+  /// culling) só quando o zoom muda ou a viewport se desloca o suficiente,
+  /// evitando uma cascata de setState a cada frame do gesto.
+  void _syncCamera(MapCamera camera) {
+    if (!mounted) return;
+    final zoomChanged = (camera.zoom - _cameraZoom).abs() >= 0.01;
+    final bounds = camera.visibleBounds;
+    final boundsChanged = _boundsMovedEnough(bounds);
+    if (!zoomChanged && !boundsChanged) return;
+    setState(() {
+      _cameraZoom = camera.zoom;
+      _visibleBounds = bounds;
+    });
+  }
+
+  /// Verdadeiro quando a viewport mudou mais que ~5% do seu próprio span em
+  /// qualquer borda — limiar que mantém o culling fluido sem rebuildar a cada
+  /// pixel arrastado.
+  bool _boundsMovedEnough(LatLngBounds bounds) {
+    final current = _visibleBounds;
+    if (current == null) return true;
+    final lonSpan = (bounds.east - bounds.west).abs();
+    final latSpan = (bounds.north - bounds.south).abs();
+    final lonEps = lonSpan * 0.05;
+    final latEps = latSpan * 0.05;
+    return (bounds.west - current.west).abs() > lonEps ||
+        (bounds.east - current.east).abs() > lonEps ||
+        (bounds.south - current.south).abs() > latEps ||
+        (bounds.north - current.north).abs() > latEps;
   }
 
   void _scheduleViewportLoad(MapCamera camera, {bool force = false}) {
-    _syncCameraZoom(camera.zoom);
+    _syncCamera(camera);
 
     if (camera.zoom < _minViewportZoom) {
       _viewportDebounce?.cancel();
@@ -128,12 +171,20 @@ class _MapScreenState extends State<MapScreen> {
         _catches = const [];
         _selectedBody = null;
         _loadedViewport = null;
+        _loadedZoom = null;
       });
       return;
     }
 
     final visibleBounds = camera.visibleBounds;
-    if (!force && _loadedViewport?.contains(visibleBounds) == true) {
+    final zoom = camera.zoom.round();
+    // Pula o fetch só quando o que já está em memória cobre a viewport E
+    // continua na mesma faixa de simplificação. Ao dar zoom in cruzando uma
+    // faixa, refazemos para trazer geometria mais detalhada.
+    if (!force &&
+        _loadedViewport?.contains(visibleBounds) == true &&
+        _loadedZoom != null &&
+        _toleranceBand(zoom) == _toleranceBand(_loadedZoom!)) {
       return;
     }
 
@@ -143,7 +194,6 @@ class _MapScreenState extends State<MapScreen> {
       visibleBounds,
       paddingFactor: _viewportPadding,
     );
-    final zoom = camera.zoom.round();
 
     _viewportDebounce = Timer(const Duration(milliseconds: 350), () {
       unawaited(_loadViewportData(target: target, zoom: zoom, seq: seq));
@@ -178,6 +228,7 @@ class _MapScreenState extends State<MapScreen> {
         _loading = false;
         _refreshing = false;
         _loadedViewport = target;
+        _loadedZoom = zoom;
         if (_waterBodies.isEmpty) {
           _error = null;
         }
@@ -501,6 +552,12 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Culling: resolve uma única vez por build quais corpos estão na viewport
+    // e deriva as camadas a partir disso, evitando refiltrar/reparsear tudo.
+    final visible = _visibleBodies;
+    final lineStrings = _lineStringsFor(visible);
+    final polygons = _polygonsFor(visible);
+    final markers = _markersFor(visible);
     return Scaffold(
       body: Stack(
         children: [
@@ -511,7 +568,7 @@ class _MapScreenState extends State<MapScreen> {
               initialZoom: _effectiveInitialZoom,
               onTap: _onMapTap,
               onPositionChanged: (camera, hasGesture) {
-                _syncCameraZoom(camera.zoom);
+                _syncCamera(camera);
                 if (hasGesture) {
                   _scheduleViewportLoad(camera);
                 }
@@ -530,11 +587,10 @@ class _MapScreenState extends State<MapScreen> {
                   errorTileCallback: (tile, error, _) =>
                       AppLog.tileError(error),
                 ),
-              if (_lineStrings.isNotEmpty)
-                PolylineLayer<Object>(polylines: _lineStrings),
-              if (_polygons.isNotEmpty)
-                PolygonLayer<Object>(polygons: _polygons),
-              MarkerLayer(markers: _markers),
+              if (lineStrings.isNotEmpty)
+                PolylineLayer<Object>(polylines: lineStrings),
+              if (polygons.isNotEmpty) PolygonLayer<Object>(polygons: polygons),
+              MarkerLayer(markers: markers),
               if (!_markingMode) MarkerLayer(markers: _catchMarkers),
             ],
           ),
@@ -837,29 +893,97 @@ class _MapScreenState extends State<MapScreen> {
     return '~${(distanceMeters / 1000).toStringAsFixed(1)} km';
   }
 
-  List<Polyline<Object>> get _lineStrings {
+  /// Faixa de simplificação por zoom — espelha `zoomToTolerance` do backend.
+  /// Usada para refazer o fetch quando o zoom cruza para outra faixa.
+  int _toleranceBand(int zoom) {
+    if (zoom <= 8) return 0;
+    if (zoom <= 10) return 1;
+    if (zoom <= 13) return 2;
+    return 3;
+  }
+
+  /// Bounding box da geometria de um corpo (com cache por id). Percorre as
+  /// coordenadas GeoJSON achando os extremos de lat/lon.
+  _Bbox? _bodyBounds(WaterBody body) {
+    final cached = _bodyBoundsCache[body.id];
+    if (cached != null) return cached;
+
+    double? minLat, minLon, maxLat, maxLon;
+    void visit(dynamic node) {
+      if (node is! List || node.isEmpty) return;
+      // Uma posição GeoJSON é [lon, lat]; um container é lista de listas.
+      if (node[0] is num && node.length >= 2 && node[1] is num) {
+        final lon = (node[0] as num).toDouble();
+        final lat = (node[1] as num).toDouble();
+        minLon = minLon == null ? lon : min(minLon!, lon);
+        maxLon = maxLon == null ? lon : max(maxLon!, lon);
+        minLat = minLat == null ? lat : min(minLat!, lat);
+        maxLat = maxLat == null ? lat : max(maxLat!, lat);
+        return;
+      }
+      for (final child in node) {
+        visit(child);
+      }
+    }
+
+    visit(body.geometry['coordinates']);
+    if (minLat == null) {
+      // Geometria sem coordenadas: cai no centro, se houver.
+      final center = body.centerLocation;
+      if (center == null) return null;
+      final b = _Bbox(
+        center.longitude,
+        center.latitude,
+        center.longitude,
+        center.latitude,
+      );
+      _bodyBoundsCache[body.id] = b;
+      return b;
+    }
+
+    final bounds = _Bbox(minLon!, minLat!, maxLon!, maxLat!);
+    _bodyBoundsCache[body.id] = bounds;
+    return bounds;
+  }
+
+  /// Corpos que intersectam a viewport visível atual (com folga). É a base do
+  /// culling: só estes viram linhas/polígonos/pins, mantendo o render leve
+  /// mesmo com centenas de corpos em memória.
+  List<WaterBody> get _visibleBodies {
+    final bounds = _visibleBounds;
+    if (bounds == null) return _waterBodies;
+    final viewport = _Bbox.fromBounds(bounds, paddingFactor: _cullPadding);
+    return _waterBodies
+        .where((body) {
+          final bb = _bodyBounds(body);
+          return bb == null || bb.intersects(viewport);
+        })
+        .toList(growable: false);
+  }
+
+  List<Polyline<Object>> _lineStringsFor(List<WaterBody> bodies) {
     final lines = <Polyline<Object>>[];
-    for (final body in _waterBodies) {
+    for (final body in bodies) {
       lines.addAll(_linesForBody(body));
     }
     return lines;
   }
 
-  List<Polygon<Object>> get _polygons {
+  List<Polygon<Object>> _polygonsFor(List<WaterBody> bodies) {
     final polygons = <Polygon<Object>>[];
-    for (final body in _waterBodies) {
+    for (final body in bodies) {
       polygons.addAll(_polygonsForBody(body));
     }
     return polygons;
   }
 
-  List<Marker> get _markers {
+  List<Marker> _markersFor(List<WaterBody> bodies) {
     // Pins dos corpos d'água só aparecem com zoom suficiente; mais longe,
     // só a geometria fica visível para não poluir o mapa.
     final showBodyPins = !_markingMode && _cameraZoom >= _markerMinZoom;
     final markers = <Marker>[
       if (showBodyPins)
-        for (final body in _waterBodies)
+        for (final body in bodies)
           Marker(
             point: body.centerLocation ?? _fallbackCenter(body),
             width: MapMarker.footprint,
@@ -1305,6 +1429,14 @@ class _Bbox {
         bounds.east <= east &&
         bounds.south >= south &&
         bounds.north <= north;
+  }
+
+  /// Verdadeiro quando este bbox e [other] se sobrepõem em qualquer ponto.
+  bool intersects(_Bbox other) {
+    return west <= other.east &&
+        east >= other.west &&
+        south <= other.north &&
+        north >= other.south;
   }
 
   String toQueryString() => '$west,$south,$east,$north';
