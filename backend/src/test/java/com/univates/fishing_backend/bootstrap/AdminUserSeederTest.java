@@ -1,5 +1,12 @@
 package com.univates.fishing_backend.bootstrap;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.univates.fishing_backend.entity.Role;
 import com.univates.fishing_backend.entity.User;
 import com.univates.fishing_backend.repository.UserRepository;
@@ -10,22 +17,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class AdminUserSeederTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private PasswordEncoder passwordEncoder;
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     private AdminUserSeeder seeder() {
-        return new AdminUserSeeder(userRepository, passwordEncoder,
-            "Admin@Fishing.local", "admin12345", "Administrator");
+        return new AdminUserSeeder(
+                userRepository, passwordEncoder, "Admin@Fishing.local", "admin12345", "Administrator");
     }
 
     @Test

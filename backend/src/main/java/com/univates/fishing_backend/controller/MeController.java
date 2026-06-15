@@ -35,8 +35,7 @@ public class MeController {
     @PutMapping
     @Operation(summary = "Updates the authenticated user's own name/password")
     @ApiResponse(responseCode = "200", description = "User updated")
-    public UserResponseDTO update(Authentication authentication,
-                                  @Valid @RequestBody UpdateMeRequestDTO dto) {
+    public UserResponseDTO update(Authentication authentication, @Valid @RequestBody UpdateMeRequestDTO dto) {
         return meService.updateByEmail(authentication.getName(), dto);
     }
 }

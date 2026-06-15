@@ -37,12 +37,12 @@ public class DemoUserSeeder implements DataSeeder {
             return;
         }
         userRepository.save(User.builder()
-            .name("Demo User")
-            .email(DEMO_EMAIL)
-            .password(passwordEncoder.encode("demo12345"))
-            .role(Role.USER)
-            .active(true)
-            .build());
+                .name("Demo User")
+                .email(DEMO_EMAIL)
+                .password(passwordEncoder.encode("demo12345"))
+                .role(Role.USER)
+                .active(true)
+                .build());
         log.info("Seed demo: USER de demonstração criado ({})", DEMO_EMAIL);
     }
 }

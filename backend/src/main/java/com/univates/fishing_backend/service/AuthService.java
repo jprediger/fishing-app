@@ -38,12 +38,12 @@ public class AuthService {
         }
 
         User user = User.builder()
-            .name(request.name())
-            .email(email)
-            .password(passwordEncoder.encode(request.password()))
-            .role(Role.USER)
-            .active(true)
-            .build();
+                .name(request.name())
+                .email(email)
+                .password(passwordEncoder.encode(request.password()))
+                .role(Role.USER)
+                .active(true)
+                .build();
 
         userRepository.save(user);
         log.info("Novo usuário registrado: {}", user.getEmail());
@@ -52,12 +52,13 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponseDTO login(LoginRequestDTO request) {
         String email = normalizeEmail(request.email());
-        Authentication authentication = authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(email, request.password()));
+        Authentication authentication =
+                authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
 
         TokenService.TokenResult result = tokenService.generate(authentication);
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalStateException("Usuário autenticado não encontrado: " + email));
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Usuário autenticado não encontrado: " + email));
 
         return LoginResponseDTO.bearer(result.token(), result.expiresInSeconds(), UserResponseDTO.from(user));
     }

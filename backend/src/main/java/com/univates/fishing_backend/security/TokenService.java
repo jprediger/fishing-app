@@ -1,5 +1,7 @@
 package com.univates.fishing_backend.security;
 
+import java.time.Instant;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
@@ -8,9 +10,6 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
-import java.util.stream.Collectors;
 
 @Service
 @Profile("!seed")
@@ -39,17 +38,17 @@ public class TokenService {
         Instant expiresAt = now.plusSeconds(expirationSeconds);
 
         String roles = authentication.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .map(a -> a.replaceFirst("^ROLE_", ""))
-            .collect(Collectors.joining(" "));
+                .map(GrantedAuthority::getAuthority)
+                .map(a -> a.replaceFirst("^ROLE_", ""))
+                .collect(Collectors.joining(" "));
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
-            .issuer(issuer)
-            .issuedAt(now)
-            .expiresAt(expiresAt)
-            .subject(authentication.getName())
-            .claim("roles", roles)
-            .build();
+                .issuer(issuer)
+                .issuedAt(now)
+                .expiresAt(expiresAt)
+                .subject(authentication.getName())
+                .claim("roles", roles)
+                .build();
 
         String token = encoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         return new TokenResult(token, expirationSeconds);

@@ -1,11 +1,19 @@
 package com.univates.fishing_backend.service;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.univates.fishing_backend.dto.ProdutoRequestDTO;
 import com.univates.fishing_backend.dto.ProdutoResponseDTO;
 import com.univates.fishing_backend.dto.ProdutoUpdateDTO;
 import com.univates.fishing_backend.entity.Produto;
 import com.univates.fishing_backend.exception.ResourceNotFoundException;
 import com.univates.fishing_backend.repository.ProdutoRepository;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,15 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProdutoServiceTest {
@@ -35,14 +34,14 @@ class ProdutoServiceTest {
 
     private Produto produtoExemplo() {
         return Produto.builder()
-            .id(1L)
-            .nome("Teclado")
-            .descricao("Mecânico")
-            .preco(new BigDecimal("349.90"))
-            .quantidadeEstoque(10)
-            .ativo(true)
-            .criadoEm(OffsetDateTime.now())
-            .build();
+                .id(1L)
+                .nome("Teclado")
+                .descricao("Mecânico")
+                .preco(new BigDecimal("349.90"))
+                .quantidadeEstoque(10)
+                .ativo(true)
+                .criadoEm(OffsetDateTime.now())
+                .build();
     }
 
     @Test
@@ -71,8 +70,8 @@ class ProdutoServiceTest {
         when(produtoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> produtoService.buscarPorId(99L))
-            .isInstanceOf(ResourceNotFoundException.class)
-            .hasMessageContaining("99");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("99");
     }
 
     @Test
@@ -80,9 +79,13 @@ class ProdutoServiceTest {
         ProdutoRequestDTO dto = new ProdutoRequestDTO("Mouse", null, new BigDecimal("199.90"), 50);
 
         Produto salvo = Produto.builder()
-            .id(2L).nome("Mouse").preco(new BigDecimal("199.90"))
-            .quantidadeEstoque(50).ativo(true).criadoEm(OffsetDateTime.now())
-            .build();
+                .id(2L)
+                .nome("Mouse")
+                .preco(new BigDecimal("199.90"))
+                .quantidadeEstoque(50)
+                .ativo(true)
+                .criadoEm(OffsetDateTime.now())
+                .build();
 
         when(produtoRepository.save(any())).thenReturn(salvo);
 
@@ -96,14 +99,17 @@ class ProdutoServiceTest {
     @Test
     void atualizar_produtoExiste_atualizaCamposERetornaDTO() {
         Produto existente = produtoExemplo();
-        ProdutoUpdateDTO dto = new ProdutoUpdateDTO("Teclado Pro", "Switch Red",
-            new BigDecimal("399.90"), 8, true);
+        ProdutoUpdateDTO dto = new ProdutoUpdateDTO("Teclado Pro", "Switch Red", new BigDecimal("399.90"), 8, true);
 
         Produto atualizado = Produto.builder()
-            .id(1L).nome("Teclado Pro").descricao("Switch Red")
-            .preco(new BigDecimal("399.90")).quantidadeEstoque(8)
-            .ativo(true).criadoEm(existente.getCriadoEm())
-            .build();
+                .id(1L)
+                .nome("Teclado Pro")
+                .descricao("Switch Red")
+                .preco(new BigDecimal("399.90"))
+                .quantidadeEstoque(8)
+                .ativo(true)
+                .criadoEm(existente.getCriadoEm())
+                .build();
 
         when(produtoRepository.findById(1L)).thenReturn(Optional.of(existente));
         when(produtoRepository.save(any())).thenReturn(atualizado);
@@ -119,8 +125,7 @@ class ProdutoServiceTest {
         when(produtoRepository.findById(99L)).thenReturn(Optional.empty());
         ProdutoUpdateDTO dto = new ProdutoUpdateDTO("X", null, BigDecimal.ONE, 1, true);
 
-        assertThatThrownBy(() -> produtoService.atualizar(99L, dto))
-            .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> produtoService.atualizar(99L, dto)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -137,7 +142,7 @@ class ProdutoServiceTest {
         when(produtoRepository.existsById(99L)).thenReturn(false);
 
         assertThatThrownBy(() -> produtoService.deletar(99L))
-            .isInstanceOf(ResourceNotFoundException.class)
-            .hasMessageContaining("99");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("99");
     }
 }

@@ -5,6 +5,6 @@ package com.univates.fishing_backend.entity;
  */
 public enum FishType {
     FRESHWATER, // água doce
-    SALTWATER,  // água salgada
-    BRACKISH    // água salobra
+    SALTWATER, // água salgada
+    BRACKISH // água salobra
 }

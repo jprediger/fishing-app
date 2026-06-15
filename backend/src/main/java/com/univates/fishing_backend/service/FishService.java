@@ -28,9 +28,10 @@ public class FishService {
 
     @Transactional(readOnly = true)
     public FishResponseDTO findById(Long id) {
-        return fishRepository.findById(id)
-            .map(this::toResponseDTO)
-            .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
+        return fishRepository
+                .findById(id)
+                .map(this::toResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
     }
 
     public FishResponseDTO create(FishRequestDTO dto) {
@@ -38,18 +39,19 @@ public class FishService {
             throw new DataIntegrityViolationException("Fish already registered: " + dto.name());
         }
         Fish fish = Fish.builder()
-            .name(dto.name())
-            .description(dto.description())
-            .region(dto.region())
-            .type(dto.type())
-            .icon(new Icon(dto.icon().path()))
-            .build();
+                .name(dto.name())
+                .description(dto.description())
+                .region(dto.region())
+                .type(dto.type())
+                .icon(new Icon(dto.icon().path()))
+                .build();
         return toResponseDTO(fishRepository.save(fish));
     }
 
     public FishResponseDTO update(Long id, FishRequestDTO dto) {
-        Fish fish = fishRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
+        Fish fish = fishRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
 
         if (fishRepository.existsByNameAndIdNot(dto.name(), id)) {
             throw new DataIntegrityViolationException("Fish already registered: " + dto.name());
@@ -73,14 +75,13 @@ public class FishService {
 
     private FishResponseDTO toResponseDTO(Fish fish) {
         return new FishResponseDTO(
-            fish.getId(),
-            fish.getName(),
-            fish.getDescription(),
-            fish.getRegion(),
-            fish.getType(),
-            fish.getIcon() == null ? null : new IconDTO(fish.getIcon().getPath()),
-            fish.getCreatedAt(),
-            fish.getUpdatedAt()
-        );
+                fish.getId(),
+                fish.getName(),
+                fish.getDescription(),
+                fish.getRegion(),
+                fish.getType(),
+                fish.getIcon() == null ? null : new IconDTO(fish.getIcon().getPath()),
+                fish.getCreatedAt(),
+                fish.getUpdatedAt());
     }
 }

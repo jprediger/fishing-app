@@ -56,12 +56,12 @@ public class AdminUserSeeder implements DataSeeder {
         }
 
         userRepository.save(User.builder()
-            .name(name)
-            .email(normalized)
-            .password(passwordEncoder.encode(password))
-            .role(Role.ADMIN)
-            .active(true)
-            .build());
+                .name(name)
+                .email(normalized)
+                .password(passwordEncoder.encode(password))
+                .role(Role.ADMIN)
+                .active(true)
+                .build());
 
         log.info("Seed admin: ADMIN criado ({})", normalized);
     }

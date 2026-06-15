@@ -1,14 +1,13 @@
 package com.univates.fishing_backend.bootstrap;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.stereotype.Component;
-
 import java.util.Comparator;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 
 /**
  * Executa todos os {@link DataSeeder} registrados, ordenados por {@code order()},
@@ -24,11 +23,9 @@ public class SeedRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        seeders.stream()
-            .sorted(Comparator.comparingInt(DataSeeder::order))
-            .forEach(seeder -> {
-                log.info("Seed: executando {}", seeder.getClass().getSimpleName());
-                seeder.run();
-            });
+        seeders.stream().sorted(Comparator.comparingInt(DataSeeder::order)).forEach(seeder -> {
+            log.info("Seed: executando {}", seeder.getClass().getSimpleName());
+            seeder.run();
+        });
     }
 }

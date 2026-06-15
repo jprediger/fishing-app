@@ -1,19 +1,18 @@
 package com.univates.fishing_backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
+
 import com.univates.fishing_backend.dto.WaterBodyResponseDTO;
 import com.univates.fishing_backend.entity.WaterType;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
+import java.time.OffsetDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.OffsetDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,11 +25,10 @@ class WaterBodyServiceTest {
 
     @Test
     void findInBbox_withoutParam_usesFallbackBounds() {
-        WaterBodyService waterBodyService = new WaterBodyService(
-            waterBodyRepository, objectMapper, 5000d, 500);
+        WaterBodyService waterBodyService = new WaterBodyService(waterBodyRepository, objectMapper, 5000d, 500);
         WaterBodyRepository.WaterBodyViewportRow row = row();
         when(waterBodyRepository.findInBbox(-57.70, -33.90, -49.50, -27.00, null, 500))
-            .thenReturn(List.of(row));
+                .thenReturn(List.of(row));
 
         List<WaterBodyResponseDTO> result = waterBodyService.findInBbox(null, null);
 
@@ -41,22 +39,19 @@ class WaterBodyServiceTest {
 
     @Test
     void findInBbox_invalidParam_throws() {
-        WaterBodyService waterBodyService = new WaterBodyService(
-            waterBodyRepository, objectMapper, 5000d, 500);
+        WaterBodyService waterBodyService = new WaterBodyService(waterBodyRepository, objectMapper, 5000d, 500);
         assertThatThrownBy(() -> waterBodyService.findInBbox("1,2,3", null))
-            .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void findInBbox_parsesRequestedViewport() {
-        WaterBodyService waterBodyService = new WaterBodyService(
-            waterBodyRepository, objectMapper, 5000d, 500);
+        WaterBodyService waterBodyService = new WaterBodyService(waterBodyRepository, objectMapper, 5000d, 500);
         WaterBodyRepository.WaterBodyViewportRow row = row();
         when(waterBodyRepository.findInBbox(-51.5, -30.5, -51.0, -30.0, 0.005, 500))
-            .thenReturn(List.of(row));
+                .thenReturn(List.of(row));
 
-        List<WaterBodyResponseDTO> result = waterBodyService.findInBbox(
-            "-51.5,-30.5,-51.0,-30.0", 10);
+        List<WaterBodyResponseDTO> result = waterBodyService.findInBbox("-51.5,-30.5,-51.0,-30.0", 10);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().osmId()).isEqualTo(123L);
@@ -64,11 +59,9 @@ class WaterBodyServiceTest {
 
     @Test
     void findNearest_withinRadius_returnsDto() {
-        WaterBodyService waterBodyService = new WaterBodyService(
-            waterBodyRepository, objectMapper, 5000d, 500);
+        WaterBodyService waterBodyService = new WaterBodyService(waterBodyRepository, objectMapper, 5000d, 500);
         WaterBodyRepository.WaterBodyViewportRow row = row();
-        when(waterBodyRepository.findNearest(-30.05, -50.95, 5000d))
-            .thenReturn(java.util.Optional.of(row));
+        when(waterBodyRepository.findNearest(-30.05, -50.95, 5000d)).thenReturn(java.util.Optional.of(row));
 
         var result = waterBodyService.findNearest(-30.05, -50.95);
 
@@ -78,10 +71,8 @@ class WaterBodyServiceTest {
 
     @Test
     void findNearest_outsideRadius_returnsEmpty() {
-        WaterBodyService waterBodyService = new WaterBodyService(
-            waterBodyRepository, objectMapper, 5000d, 500);
-        when(waterBodyRepository.findNearest(-30.05, -50.95, 5000d))
-            .thenReturn(java.util.Optional.empty());
+        WaterBodyService waterBodyService = new WaterBodyService(waterBodyRepository, objectMapper, 5000d, 500);
+        when(waterBodyRepository.findNearest(-30.05, -50.95, 5000d)).thenReturn(java.util.Optional.empty());
 
         var result = waterBodyService.findNearest(-30.05, -50.95);
 
@@ -89,12 +80,14 @@ class WaterBodyServiceTest {
     }
 
     private WaterBodyRepository.WaterBodyViewportRow row() {
-        WaterBodyRepository.WaterBodyViewportRow row = org.mockito.Mockito.mock(
-            WaterBodyRepository.WaterBodyViewportRow.class);
+        WaterBodyRepository.WaterBodyViewportRow row =
+                org.mockito.Mockito.mock(WaterBodyRepository.WaterBodyViewportRow.class);
         when(row.getId()).thenReturn(1L);
         when(row.getName()).thenReturn("Guaíba");
         when(row.getWaterType()).thenReturn("RIVER");
-        when(row.getGeomGeoJson()).thenReturn("""
+        when(row.getGeomGeoJson())
+                .thenReturn(
+                        """
             {"type":"LineString","coordinates":[[-51.0,-30.0],[-50.9,-30.1]]}
             """);
         when(row.getOsmId()).thenReturn(123L);

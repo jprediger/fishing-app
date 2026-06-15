@@ -3,15 +3,14 @@ package com.univates.fishing_backend.service;
 import com.univates.fishing_backend.dto.WaterBodyResponseDTO;
 import com.univates.fishing_backend.entity.WaterType;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -26,11 +25,10 @@ public class WaterBodyService {
 
     @Autowired
     public WaterBodyService(
-        WaterBodyRepository waterBodyRepository,
-        ObjectMapper objectMapper,
-        @Value("${app.water-body.nearest-radius-m:5000}") double nearestRadiusM,
-        @Value("${app.water-body.max-features:500}") int maxFeatures
-    ) {
+            WaterBodyRepository waterBodyRepository,
+            ObjectMapper objectMapper,
+            @Value("${app.water-body.nearest-radius-m:5000}") double nearestRadiusM,
+            @Value("${app.water-body.max-features:500}") int maxFeatures) {
         this.waterBodyRepository = waterBodyRepository;
         this.objectMapper = objectMapper;
         this.nearestRadiusM = nearestRadiusM;
@@ -38,43 +36,40 @@ public class WaterBodyService {
     }
 
     public List<WaterBodyResponseDTO> findInBbox(String bbox, Integer zoom) {
-        Bbox viewport = bbox == null || bbox.isBlank()
-            ? RS_FALLBACK_BBOX
-            : Bbox.parse(bbox);
+        Bbox viewport = bbox == null || bbox.isBlank() ? RS_FALLBACK_BBOX : Bbox.parse(bbox);
         Double simplifyTolerance = zoom == null ? null : zoomToTolerance(zoom);
 
-        return waterBodyRepository.findInBbox(
-                viewport.minLon(),
-                viewport.minLat(),
-                viewport.maxLon(),
-                viewport.maxLat(),
-                simplifyTolerance,
-                maxFeatures)
-            .stream()
-            .map(this::toDto)
-            .toList();
+        return waterBodyRepository
+                .findInBbox(
+                        viewport.minLon(),
+                        viewport.minLat(),
+                        viewport.maxLon(),
+                        viewport.maxLat(),
+                        simplifyTolerance,
+                        maxFeatures)
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
     public Optional<WaterBodyResponseDTO> findNearest(double lat, double lon) {
-        return waterBodyRepository.findNearest(lat, lon, nearestRadiusM)
-            .map(this::toDto);
+        return waterBodyRepository.findNearest(lat, lon, nearestRadiusM).map(this::toDto);
     }
 
     private WaterBodyResponseDTO toDto(WaterBodyRepository.WaterBodyViewportRow row) {
         JsonNode geometry = toJsonNode(row.getGeomGeoJson());
         return new WaterBodyResponseDTO(
-            row.getId(),
-            row.getName(),
-            WaterType.valueOf(row.getWaterType()),
-            geometry,
-            row.getOsmId(),
-            row.getSource(),
-            row.getCenterLon(),
-            row.getCenterLat(),
-            row.getDistanceMeters(),
-            row.getCreatedAt(),
-            row.getUpdatedAt()
-        );
+                row.getId(),
+                row.getName(),
+                WaterType.valueOf(row.getWaterType()),
+                geometry,
+                row.getOsmId(),
+                row.getSource(),
+                row.getCenterLon(),
+                row.getCenterLat(),
+                row.getDistanceMeters(),
+                row.getCreatedAt(),
+                row.getUpdatedAt());
     }
 
     private double zoomToTolerance(int zoom) {

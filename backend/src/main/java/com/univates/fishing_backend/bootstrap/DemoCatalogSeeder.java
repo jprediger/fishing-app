@@ -6,13 +6,12 @@ import com.univates.fishing_backend.entity.Icon;
 import com.univates.fishing_backend.entity.Produto;
 import com.univates.fishing_backend.repository.FishRepository;
 import com.univates.fishing_backend.repository.ProdutoRepository;
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
 
 /**
  * Catálogo de exemplo (peixes e produtos) para a app subir demonstrável.
@@ -41,19 +40,19 @@ public class DemoCatalogSeeder implements DataSeeder {
 
         if (produtoRepository.count() == 0) {
             produtoRepository.save(Produto.builder()
-                .nome("Vara de pesca 1,80m")
-                .descricao("Vara telescópica em fibra de carbono.")
-                .preco(new BigDecimal("149.90"))
-                .quantidadeEstoque(20)
-                .ativo(true)
-                .build());
+                    .nome("Vara de pesca 1,80m")
+                    .descricao("Vara telescópica em fibra de carbono.")
+                    .preco(new BigDecimal("149.90"))
+                    .quantidadeEstoque(20)
+                    .ativo(true)
+                    .build());
             produtoRepository.save(Produto.builder()
-                .nome("Molinete 4000")
-                .descricao("Molinete com 5 rolamentos.")
-                .preco(new BigDecimal("199.90"))
-                .quantidadeEstoque(15)
-                .ativo(true)
-                .build());
+                    .nome("Molinete 4000")
+                    .descricao("Molinete com 5 rolamentos.")
+                    .preco(new BigDecimal("199.90"))
+                    .quantidadeEstoque(15)
+                    .ativo(true)
+                    .build());
             log.info("Seed demo: produtos de exemplo criados");
         }
     }
@@ -63,12 +62,12 @@ public class DemoCatalogSeeder implements DataSeeder {
             return;
         }
         fishRepository.save(Fish.builder()
-            .name(name)
-            .description(description)
-            .region(region)
-            .type(type)
-            .icon(new Icon(null))
-            .build());
+                .name(name)
+                .description(description)
+                .region(region)
+                .type(type)
+                .icon(new Icon(null))
+                .build());
         log.info("Seed demo: peixe de exemplo criado ({})", name);
     }
 }

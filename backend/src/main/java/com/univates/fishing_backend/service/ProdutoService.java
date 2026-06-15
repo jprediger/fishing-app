@@ -26,24 +26,26 @@ public class ProdutoService {
 
     @Transactional(readOnly = true)
     public ProdutoResponseDTO buscarPorId(Long id) {
-        return produtoRepository.findById(id)
-            .map(this::toResponseDTO)
-            .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado com id: " + id));
+        return produtoRepository
+                .findById(id)
+                .map(this::toResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado com id: " + id));
     }
 
     public ProdutoResponseDTO criar(ProdutoRequestDTO dto) {
         Produto produto = Produto.builder()
-            .nome(dto.nome())
-            .descricao(dto.descricao())
-            .preco(dto.preco())
-            .quantidadeEstoque(dto.quantidadeEstoque())
-            .build();
+                .nome(dto.nome())
+                .descricao(dto.descricao())
+                .preco(dto.preco())
+                .quantidadeEstoque(dto.quantidadeEstoque())
+                .build();
         return toResponseDTO(produtoRepository.save(produto));
     }
 
     public ProdutoResponseDTO atualizar(Long id, ProdutoUpdateDTO dto) {
-        Produto produto = produtoRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado com id: " + id));
+        Produto produto = produtoRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado com id: " + id));
 
         produto.setNome(dto.nome());
         produto.setDescricao(dto.descricao());
@@ -63,14 +65,13 @@ public class ProdutoService {
 
     private ProdutoResponseDTO toResponseDTO(Produto produto) {
         return new ProdutoResponseDTO(
-            produto.getId(),
-            produto.getNome(),
-            produto.getDescricao(),
-            produto.getPreco(),
-            produto.getQuantidadeEstoque(),
-            produto.getAtivo(),
-            produto.getCriadoEm(),
-            produto.getAtualizadoEm()
-        );
+                produto.getId(),
+                produto.getNome(),
+                produto.getDescricao(),
+                produto.getPreco(),
+                produto.getQuantidadeEstoque(),
+                produto.getAtivo(),
+                produto.getCriadoEm(),
+                produto.getAtualizadoEm());
     }
 }

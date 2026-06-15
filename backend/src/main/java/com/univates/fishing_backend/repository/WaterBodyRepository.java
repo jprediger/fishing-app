@@ -1,19 +1,20 @@
 package com.univates.fishing_backend.repository;
 
 import com.univates.fishing_backend.entity.WaterBody;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
 
     Optional<WaterBody> findByOsmId(Long osmId);
 
-    @Query(value = """
+    @Query(
+            value =
+                    """
         SELECT
             id,
             name,
@@ -38,17 +39,19 @@ public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
         )
         ORDER BY id
         LIMIT :maxFeatures
-        """, nativeQuery = true)
+        """,
+            nativeQuery = true)
     List<WaterBodyViewportRow> findInBbox(
-        @Param("minLon") double minLon,
-        @Param("minLat") double minLat,
-        @Param("maxLon") double maxLon,
-        @Param("maxLat") double maxLat,
-        @Param("simplifyTolerance") Double simplifyTolerance,
-        @Param("maxFeatures") int maxFeatures
-    );
+            @Param("minLon") double minLon,
+            @Param("minLat") double minLat,
+            @Param("maxLon") double maxLon,
+            @Param("maxLat") double maxLat,
+            @Param("simplifyTolerance") Double simplifyTolerance,
+            @Param("maxFeatures") int maxFeatures);
 
-    @Query(value = """
+    @Query(
+            value =
+                    """
         SELECT
             id,
             name,
@@ -72,12 +75,10 @@ public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
         )
         ORDER BY geom::geography <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
         LIMIT 1
-        """, nativeQuery = true)
+        """,
+            nativeQuery = true)
     Optional<WaterBodyViewportRow> findNearest(
-        @Param("lat") double lat,
-        @Param("lon") double lon,
-        @Param("radiusM") double radiusM
-    );
+            @Param("lat") double lat, @Param("lon") double lon, @Param("radiusM") double radiusM);
 
     interface WaterBodyViewportRow {
         Long getId();

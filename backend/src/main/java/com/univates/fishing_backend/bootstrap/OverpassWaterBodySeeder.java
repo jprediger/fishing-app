@@ -3,19 +3,12 @@ package com.univates.fishing_backend.bootstrap;
 import com.univates.fishing_backend.entity.WaterBody;
 import com.univates.fishing_backend.entity.WaterType;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.locationtech.jts.geom.*;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -23,6 +16,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.locationtech.jts.geom.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,7 +32,8 @@ import tools.jackson.databind.ObjectMapper;
 public class OverpassWaterBodySeeder implements DataSeeder {
 
     private static final String OVERPASS_URL = "https://overpass-api.de/api/interpreter";
-    private static final String OVERPASS_QUERY = """
+    private static final String OVERPASS_QUERY =
+            """
         [out:json][timeout:180];
         area["ISO3166-2"="BR-RS"]->.rs;
         (
@@ -58,10 +58,10 @@ public class OverpassWaterBodySeeder implements DataSeeder {
     public void run() {
         OverpassResponse response = fetchOverpass();
         List<WaterSeedCandidate> candidates = response.elements().stream()
-            .map(this::toCandidate)
-            .flatMap(Optional::stream)
-            .sorted(Comparator.comparingLong(WaterSeedCandidate::osmId))
-            .toList();
+                .map(this::toCandidate)
+                .flatMap(Optional::stream)
+                .sorted(Comparator.comparingLong(WaterSeedCandidate::osmId))
+                .toList();
 
         log.info("WaterBody seed: {} feições candidatas", candidates.size());
         for (WaterSeedCandidate candidate : candidates) {
@@ -70,21 +70,22 @@ public class OverpassWaterBodySeeder implements DataSeeder {
     }
 
     private void upsert(WaterSeedCandidate candidate) {
-        WaterBody body = waterBodyRepository.findByOsmId(candidate.osmId())
-            .map(existing -> {
-                existing.setName(candidate.name());
-                existing.setWaterType(candidate.waterType());
-                existing.setGeom(candidate.geometry());
-                existing.setSource(candidate.source());
-                return existing;
-            })
-            .orElseGet(() -> WaterBody.builder()
-                .osmId(candidate.osmId())
-                .name(candidate.name())
-                .waterType(candidate.waterType())
-                .geom(candidate.geometry())
-                .source(candidate.source())
-                .build());
+        WaterBody body = waterBodyRepository
+                .findByOsmId(candidate.osmId())
+                .map(existing -> {
+                    existing.setName(candidate.name());
+                    existing.setWaterType(candidate.waterType());
+                    existing.setGeom(candidate.geometry());
+                    existing.setSource(candidate.source());
+                    return existing;
+                })
+                .orElseGet(() -> WaterBody.builder()
+                        .osmId(candidate.osmId())
+                        .name(candidate.name())
+                        .waterType(candidate.waterType())
+                        .geom(candidate.geometry())
+                        .source(candidate.source())
+                        .build());
 
         waterBodyRepository.save(body);
     }
@@ -92,16 +93,16 @@ public class OverpassWaterBodySeeder implements DataSeeder {
     private OverpassResponse fetchOverpass() {
         try {
             HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
 
             HttpRequest request = HttpRequest.newBuilder(URI.create(OVERPASS_URL))
-                .timeout(Duration.ofSeconds(240))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("User-Agent", "fishing-app/1.0")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                    "data=" + URLEncoder.encode(OVERPASS_QUERY, StandardCharsets.UTF_8)))
-                .build();
+                    .timeout(Duration.ofSeconds(240))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("User-Agent", "fishing-app/1.0")
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            "data=" + URLEncoder.encode(OVERPASS_QUERY, StandardCharsets.UTF_8)))
+                    .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -127,11 +128,12 @@ public class OverpassWaterBodySeeder implements DataSeeder {
 
         Map<String, String> tags = objectMapper.convertValue(element.path("tags"), Map.class);
         WaterType waterType = deriveWaterType(tags);
-        Geometry geometry = switch (type) {
-            case "way" -> parseWayGeometry(element, waterType);
-            case "relation" -> parseRelationGeometry(element, waterType);
-            default -> null;
-        };
+        Geometry geometry =
+                switch (type) {
+                    case "way" -> parseWayGeometry(element, waterType);
+                    case "relation" -> parseRelationGeometry(element, waterType);
+                    default -> null;
+                };
 
         if (geometry == null || geometry.isEmpty()) {
             log.debug("WaterBody seed: geometria ausente para osm {}", osmId);
@@ -171,8 +173,8 @@ public class OverpassWaterBodySeeder implements DataSeeder {
                 continue;
             }
             Geometry geometry = isClosed(memberCoordinates) && isPolygonLike(waterType)
-                ? polygonFromRing(memberCoordinates)
-                : geometryFactory().createLineString(memberCoordinates.toArray(Coordinate[]::new));
+                    ? polygonFromRing(memberCoordinates)
+                    : geometryFactory().createLineString(memberCoordinates.toArray(Coordinate[]::new));
             memberGeometries.add(geometry);
         }
 
@@ -181,13 +183,16 @@ public class OverpassWaterBodySeeder implements DataSeeder {
         }
 
         if (memberGeometries.stream().allMatch(Polygon.class::isInstance)) {
-            return geometryFactory().createMultiPolygon(
-                memberGeometries.stream().map(Polygon.class::cast).toArray(Polygon[]::new));
+            return geometryFactory()
+                    .createMultiPolygon(
+                            memberGeometries.stream().map(Polygon.class::cast).toArray(Polygon[]::new));
         }
 
         if (memberGeometries.stream().allMatch(LineString.class::isInstance)) {
-            return geometryFactory().createMultiLineString(
-                memberGeometries.stream().map(LineString.class::cast).toArray(LineString[]::new));
+            return geometryFactory()
+                    .createMultiLineString(memberGeometries.stream()
+                            .map(LineString.class::cast)
+                            .toArray(LineString[]::new));
         }
 
         return memberGeometries.getFirst();
