@@ -428,7 +428,6 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
   }
 
   Widget _buildReviewStep(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
@@ -502,13 +501,9 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        _SectionCard(
+        const _SectionCard(
           title: 'Clima',
-          subtitle: 'Preenchido automaticamente no backend.',
-          child: Text(
-            'Best-effort: se a API falhar, o registro ainda salva.',
-            style: TextStyle(color: cs.onSurfaceVariant),
-          ),
+          subtitle: 'Preenchido automaticamente.',
         ),
       ],
     );
@@ -582,13 +577,9 @@ class _StepHeader extends StatelessWidget {
 class _SectionCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final Widget child;
+  final Widget? child;
 
-  const _SectionCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
+  const _SectionCard({required this.title, required this.subtitle, this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -602,8 +593,7 @@ class _SectionCard extends StatelessWidget {
             Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(subtitle, style: TextStyle(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 16),
-            child,
+            if (child != null) ...[const SizedBox(height: 16), child!],
           ],
         ),
       ),
