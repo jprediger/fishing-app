@@ -205,8 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _loadMore();
   }
 
-  void _openRecord(CatchRecord record) {
-    Navigator.of(context).push(
+  Future<void> _openRecord(CatchRecord record) async {
+    final result = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => CatchDetailScreen(
           initialRecord: record,
@@ -215,6 +215,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+    if (!mounted) return;
+    // CatchDetailScreen retorna `true` ao excluir e o registro atualizado ao
+    // editar. Em ambos os casos recarregamos para refletir lista e contadores.
+    if (result == true || result is CatchRecord) {
+      await _loadInitial();
+    }
   }
 
   void _openEdit() {
@@ -462,6 +468,8 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
+  static const String _heroTag = 'profile-avatar';
+
   final String? uploadUrl;
   final String? authToken;
 
@@ -486,19 +494,96 @@ class _Avatar extends StatelessWidget {
       return placeholder;
     }
 
-    return ClipOval(
-      child: SizedBox(
-        width: 88,
-        height: 88,
-        child: Image.network(
-          uploadUrl!,
-          headers: authToken == null
-              ? null
-              : {'Authorization': 'Bearer $authToken'},
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return placeholder;
-          },
+    return Semantics(
+      button: true,
+      label: 'Abrir foto de perfil',
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => _AvatarViewer(
+              heroTag: _heroTag,
+              imageUrl: uploadUrl!,
+              authToken: authToken,
+            ),
+          ),
+        ),
+        child: ClipOval(
+          child: SizedBox(
+            width: 88,
+            height: 88,
+            child: Hero(
+              tag: _heroTag,
+              child: Image.network(
+                uploadUrl!,
+                headers: authToken == null
+                    ? null
+                    : {'Authorization': 'Bearer $authToken'},
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return placeholder;
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Visualização em tela cheia da foto de perfil, com zoom por gesto.
+class _AvatarViewer extends StatelessWidget {
+  final String heroTag;
+  final String imageUrl;
+  final String? authToken;
+
+  const _AvatarViewer({
+    required this.heroTag,
+    required this.imageUrl,
+    required this.authToken,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      extendBodyBehindAppBar: true,
+      body: GestureDetector(
+        onTap: () => Navigator.of(context).maybePop(),
+        child: Center(
+          child: Hero(
+            tag: heroTag,
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 5,
+              child: Image.network(
+                imageUrl,
+                headers: authToken == null
+                    ? null
+                    : {'Authorization': 'Bearer $authToken'},
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

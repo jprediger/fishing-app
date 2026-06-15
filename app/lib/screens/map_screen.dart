@@ -15,6 +15,7 @@ import '../models/water_body.dart';
 import '../services/catch_service.dart';
 import '../services/establishment_service.dart';
 import '../services/fish_service.dart';
+import '../services/location_service.dart';
 import '../services/water_body_service.dart';
 import '../widgets/map_marker.dart';
 import 'catch_detail_screen.dart';
@@ -29,6 +30,7 @@ class MapScreen extends StatefulWidget {
   final String? authToken;
   final bool showTiles;
   final double? debugInitialZoom;
+  final LocationService? locationService;
 
   /// Estabelecimento a focar no mapa (vindo da aba "Locais"). Quando muda para
   /// um valor não nulo, o mapa centraliza nele e exibe um marcador.
@@ -36,6 +38,9 @@ class MapScreen extends StatefulWidget {
 
   /// Test hook: pre-seeds draft point when mark mode opens.
   final LatLng? debugInitialDraftPoint;
+
+  /// Test hook: observa quando o mapa centraliza na localização do usuário.
+  final ValueChanged<LatLng>? debugOnUserLocationCentered;
 
   const MapScreen({
     super.key,
@@ -46,8 +51,10 @@ class MapScreen extends StatefulWidget {
     this.authToken,
     this.showTiles = true,
     this.debugInitialZoom,
+    this.locationService,
     this.focusEstablishment,
     this.debugInitialDraftPoint,
+    this.debugOnUserLocationCentered,
   });
 
   @override
@@ -69,6 +76,8 @@ class _MapScreenState extends State<MapScreen> {
   static const double _markerMinZoom = 15.0;
 
   static const double _viewportPadding = 0.2;
+  static const double _userFocusZoom = 15.5;
+  static const Duration _userLocationMaxAge = Duration(minutes: 3);
 
   /// Folga aplicada à viewport visível ao decidir quais corpos desenhar
   /// (culling). Mantém corpos junto às bordas visíveis enquanto o usuário
@@ -83,6 +92,7 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _catchDebounce;
   late final WaterBodyService _service;
   late final CatchService _catchService;
+  late final LocationService _locationService;
 
   int _viewportRequestSeq = 0;
   int _nearestRequestSeq = 0;
@@ -126,6 +136,9 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Estabelecimento selecionado (por toque no marcador ou vindo de "Locais").
   Establishment? _selectedEstablishment;
+  LatLng? _userLocation;
+  DateTime? _userLocationFetchedAt;
+  bool _locatingUser = false;
 
   @override
   void initState() {
@@ -134,6 +147,9 @@ class _MapScreenState extends State<MapScreen> {
     _catchService = widget.catchService ?? CatchService();
     _establishmentService =
         widget.establishmentService ?? EstablishmentService();
+    _locationService =
+        widget.locationService ?? const GeolocatorLocationService();
+    unawaited(_hydrateUserLocationIfAllowed());
   }
 
   @override
@@ -211,6 +227,17 @@ class _MapScreenState extends State<MapScreen> {
     } on ApiException {
       // Sem estabelecimentos: a camada simplesmente fica vazia.
     }
+  }
+
+  Future<void> _hydrateUserLocationIfAllowed() async {
+    final permission = await _locationService.checkPermission();
+    if (!mounted || !permission.isGranted) return;
+    await _resolveUserLocation(
+      requestPermission: false,
+      moveMap: false,
+      useCache: false,
+      showFeedback: false,
+    );
   }
 
   void _selectEstablishment(Establishment establishment) {
@@ -455,9 +482,104 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _recenter() {
-    _mapController.move(_initialCenter, _effectiveInitialZoom);
+  bool get _hasFreshUserLocation {
+    final location = _userLocation;
+    final fetchedAt = _userLocationFetchedAt;
+    if (location == null || fetchedAt == null) return false;
+    return DateTime.now().difference(fetchedAt) <= _userLocationMaxAge;
+  }
+
+  Future<void> _recenter() async {
+    await _resolveUserLocation(
+      requestPermission: true,
+      moveMap: true,
+      useCache: true,
+      showFeedback: true,
+    );
+  }
+
+  Future<LatLng?> _resolveUserLocation({
+    required bool requestPermission,
+    required bool moveMap,
+    required bool useCache,
+    required bool showFeedback,
+  }) async {
+    if (useCache && _hasFreshUserLocation) {
+      final cached = _userLocation!;
+      if (moveMap) _centerOnUser(cached);
+      return cached;
+    }
+
+    if (_locatingUser) return _userLocation;
+
+    if (!mounted) return _userLocation;
+    setState(() => _locatingUser = true);
+
+    try {
+      final enabled = await _locationService.isServiceEnabled();
+      if (!enabled) {
+        if (showFeedback) {
+          _showLocationMessage(
+            'Ative a localização do dispositivo para usar este recurso.',
+          );
+        }
+        return null;
+      }
+
+      var permission = await _locationService.checkPermission();
+      if (!permission.isGranted && requestPermission) {
+        permission = await _locationService.requestPermission();
+      }
+      if (!permission.isGranted) {
+        if (showFeedback) {
+          _showLocationMessage(_permissionMessage(permission));
+        }
+        return null;
+      }
+
+      final location = await _locationService.getCurrentLocation();
+      if (!mounted || location == null) return _userLocation;
+      setState(() {
+        _userLocation = location.coordinates;
+        _userLocationFetchedAt = location.timestamp ?? DateTime.now();
+      });
+      if (moveMap) _centerOnUser(location.coordinates);
+      return location.coordinates;
+    } on LocationException catch (e) {
+      if (showFeedback) _showLocationMessage(e.message);
+      return null;
+    } finally {
+      if (mounted) {
+        setState(() => _locatingUser = false);
+      }
+    }
+  }
+
+  void _centerOnUser(LatLng point) {
+    if (!_mapReady) return;
+    final zoom = max(_cameraZoom, _userFocusZoom).toDouble();
+    _mapController.move(point, zoom);
+    widget.debugOnUserLocationCentered?.call(point);
     _scheduleViewportLoad(_mapController.camera, force: true);
+  }
+
+  String _permissionMessage(AppLocationPermission permission) {
+    switch (permission) {
+      case AppLocationPermission.deniedForever:
+        return 'Permita a localização nas configurações do sistema para centralizar você no mapa.';
+      case AppLocationPermission.denied:
+        return 'Permita o acesso à localização para centralizar você no mapa.';
+      case AppLocationPermission.whileInUse:
+      case AppLocationPermission.always:
+        return 'Não foi possível obter sua localização agora.';
+    }
+  }
+
+  void _showLocationMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   double get _effectiveInitialZoom => widget.debugInitialZoom ?? _initialZoom;
@@ -687,6 +809,8 @@ class _MapScreenState extends State<MapScreen> {
               if (_showWaterBodies && polygons.isNotEmpty)
                 PolygonLayer<Object>(polygons: polygons),
               MarkerLayer(markers: markers),
+              if (!_markingMode && _userMarkers.isNotEmpty)
+                MarkerLayer(markers: _userMarkers),
               if (!_markingMode && _showCatches)
                 MarkerLayer(markers: _catchMarkers),
               if (!_markingMode) MarkerLayer(markers: _establishmentMarkers),
@@ -763,7 +887,17 @@ class _MapScreenState extends State<MapScreen> {
               foregroundColor: AppColors.primary,
               elevation: 3,
               onPressed: _recenter,
-              child: const Icon(Icons.my_location),
+              tooltip: 'Centralizar em mim',
+              child: _locatingUser
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : const Icon(Icons.my_location),
             ),
           ],
         ),
@@ -1328,6 +1462,24 @@ class _MapScreenState extends State<MapScreen> {
           );
         })
         .toList();
+  }
+
+  List<Marker> get _userMarkers {
+    final point = _userLocation;
+    if (point == null) return const [];
+    return [
+      Marker(
+        point: point,
+        width: MapMarker.footprint,
+        height: MapMarker.footprint,
+        child: const IgnorePointer(
+          child: MapMarker(
+            key: ValueKey('user-location-marker'),
+            kind: MapMarkerKind.user,
+          ),
+        ),
+      ),
+    ];
   }
 
   List<Marker> get _establishmentMarkers {

@@ -8,7 +8,8 @@ enum MapMarkerKind {
   waterBody(AppColors.markerWaterBody, Icons.water_drop),
   catchRecordMine(AppColors.markerCatchMine, Icons.set_meal),
   catchRecord(AppColors.markerCatchOther, Icons.set_meal),
-  establishment(AppColors.markerEstablishment, Icons.store);
+  establishment(AppColors.markerEstablishment, Icons.store),
+  user(AppColors.markerUser, Icons.person);
 
   const MapMarkerKind(this.color, this.icon);
 

@@ -22,6 +22,7 @@ class AppColors {
   static const Color markerCatchOther = Color(0xFF2EC4B6); // pesca de outros
   static const Color markerCatch = markerCatchOther; // alias legado
   static const Color markerEstablishment = sand; // estabelecimentos (futuro)
+  static const Color markerUser = Color(0xFF355CDE); // posição do usuário
 
   /// Fundo claro legado. Mantido por compatibilidade; prefira
   /// `colorScheme.surface` para responder ao tema.
