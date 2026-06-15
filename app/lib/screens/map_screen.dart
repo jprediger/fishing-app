@@ -14,6 +14,7 @@ import '../models/water_body.dart';
 import '../services/catch_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
+import '../widgets/map_marker.dart';
 import 'catch_detail_screen.dart';
 import 'catch_form_screen.dart';
 
@@ -45,6 +46,11 @@ class _MapScreenState extends State<MapScreen> {
   static const LatLng _initialCenter = LatLng(-30.0846, -51.2645);
   static const double _initialZoom = 10.7;
   static const double _minViewportZoom = 9.0;
+
+  /// Acima deste zoom os pins dos corpos d'água aparecem. Abaixo, só a
+  /// geometria (linhas/polígonos) fica visível para não poluir a tela.
+  static const double _markerMinZoom = 12.0;
+
   static const double _viewportPadding = 0.2;
 
   final MapController _mapController = MapController();
@@ -59,7 +65,7 @@ class _MapScreenState extends State<MapScreen> {
   int _viewportRequestSeq = 0;
   int _nearestRequestSeq = 0;
   int _catchRequestSeq = 0;
-  int _selectedIndex = 0;
+  WaterBody? _selectedBody;
   bool _loading = true;
   bool _refreshing = false;
   bool _markingMode = false;
@@ -115,7 +121,7 @@ class _MapScreenState extends State<MapScreen> {
         _error = null;
         _waterBodies = const [];
         _catches = const [];
-        _selectedIndex = 0;
+        _selectedBody = null;
         _loadedViewport = null;
       });
       return;
@@ -160,9 +166,10 @@ class _MapScreenState extends State<MapScreen> {
       if (!mounted || seq != _viewportRequestSeq) return;
       setState(() {
         _waterBodies = waterBodies;
-        _selectedIndex = waterBodies.isEmpty
-            ? 0
-            : _selectedIndex.clamp(0, waterBodies.length - 1);
+        if (_selectedBody != null &&
+            !waterBodies.any((b) => b.id == _selectedBody!.id)) {
+          _selectedBody = null;
+        }
         _loading = false;
         _refreshing = false;
         _loadedViewport = target;
@@ -240,7 +247,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onMapTap(TapPosition _, LatLng point) {
-    if (!_markingMode) return;
+    if (!_markingMode) {
+      if (_selectedBody != null) setState(() => _selectedBody = null);
+      return;
+    }
     _setDraftPoint(point);
   }
 
@@ -305,14 +315,10 @@ class _MapScreenState extends State<MapScreen> {
     _scheduleViewportLoad(_mapController.camera, force: true);
   }
 
-  void _selectBody(int index) {
-    if (_waterBodies.isEmpty) return;
-    final safeIndex = index.clamp(0, _waterBodies.length - 1);
-    final body = _waterBodies[safeIndex];
-    final location = body.centerLocation ?? _fallbackCenter(body);
-
-    setState(() => _selectedIndex = safeIndex);
-    _mapController.move(location, 11.5);
+  /// Seleciona o corpo d'água tocado, exibindo o card inferior. Não move
+  /// nem reposiciona o mapa — apenas destaca o pin e abre o card.
+  void _selectBody(WaterBody body) {
+    setState(() => _selectedBody = body);
   }
 
   LatLng _fallbackCenter(WaterBody body) {
@@ -346,63 +352,22 @@ class _MapScreenState extends State<MapScreen> {
     return null;
   }
 
-  void _showDetails(WaterBody body) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.water_drop,
-                  color: AppColors.primary,
-                  size: 28,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    body.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-              ],
+  /// Abre o wizard de registro para o corpo d'água selecionado no mapa,
+  /// usando o centro do corpo d'água como ponto inicial.
+  void _openCatchFormForBody(WaterBody body) {
+    final point = body.centerLocation ?? _fallbackCenter(body);
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => CatchFormScreen.create(
+              draft: CatchDraft(point: point, waterBody: body),
+              fishService: widget.fishService,
+              catchService: _catchService,
             ),
-            const SizedBox(height: 10),
-            Text(
-              '${body.waterType.label} • ${body.source ?? "OSM"}'
-              '${body.osmId == null ? "" : " • OSM ${body.osmId}"}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Geometria ${body.geometryType ?? "desconhecida"}',
-              style: const TextStyle(height: 1.4, color: Colors.black87),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.center_focus_strong),
-                label: const Text('Centralizar'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        )
+        .then((_) => _scheduleViewportLoad(_mapController.camera, force: true));
   }
 
   void _openCatchForm() {
@@ -424,6 +389,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openCatchDetail(CatchRecord record) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -451,7 +417,10 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(height: 8),
             Text(
               '${record.waterBody.name} • ${_formatCatchDate(record.caughtAt)}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -461,6 +430,7 @@ class _MapScreenState extends State<MapScreen> {
                               LocationVisibility.riverOnly)
                   ? 'Local aproximado'
                   : 'Ponto exato',
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -505,6 +475,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       body: Stack(
         children: [
@@ -541,14 +512,13 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
           if (_loading)
-            const Positioned.fill(
+            Positioned.fill(
               child: ColoredBox(
-                color: Color(0x1AFFFFFF),
-                child: Center(child: CircularProgressIndicator()),
+                color: cs.surface.withValues(alpha: 0.72),
+                child: const Center(child: CircularProgressIndicator()),
               ),
             ),
           _buildHeaderPill(),
-          if (!_markingMode && _waterBodies.isNotEmpty) _buildCarousel(),
           if (_refreshing)
             const Positioned(
               top: 0,
@@ -564,24 +534,27 @@ class _MapScreenState extends State<MapScreen> {
             _buildEmptyState(),
           if (_cameraZoom < _minViewportZoom) _buildZoomHint(),
           if (_markingMode) _buildNearestCard(),
+          if (!_markingMode && _selectedBody != null) _buildSelectedBodyCard(),
         ],
       ),
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: _markingMode ? 172 : 150),
+        padding: EdgeInsets.only(
+          bottom: (_markingMode || _selectedBody != null) ? 190 : 32,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             FloatingActionButton.small(
               heroTag: 'map-mark-mode',
-              backgroundColor: _markingMode ? AppColors.deep : Colors.white,
-              foregroundColor: _markingMode ? Colors.white : AppColors.primary,
+              backgroundColor: _markingMode ? AppColors.deep : cs.surface,
+              foregroundColor: _markingMode ? cs.onPrimary : AppColors.primary,
               onPressed: _toggleMarkMode,
               child: Icon(_markingMode ? Icons.close : Icons.add),
             ),
             const SizedBox(height: 12),
             FloatingActionButton(
               heroTag: 'map-recenter',
-              backgroundColor: Colors.white,
+              backgroundColor: cs.surface,
               foregroundColor: AppColors.primary,
               elevation: 3,
               onPressed: _recenter,
@@ -594,6 +567,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildHeaderPill() {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -603,11 +577,11 @@ class _MapScreenState extends State<MapScreen> {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
+                  color: cs.shadow.withValues(alpha: 0.12),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -622,6 +596,7 @@ class _MapScreenState extends State<MapScreen> {
                     gradient: AppColors.waterGradient,
                     borderRadius: BorderRadius.circular(10),
                   ),
+                  // Branco intencional sobre gradiente de marca.
                   child: Icon(
                     _markingMode ? Icons.add_location_alt : Icons.water,
                     color: Colors.white,
@@ -664,116 +639,31 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildCarousel() {
+  /// Card inferior exibido ao tocar um corpo d'água no mapa. Mesmo visual do
+  /// card do modo "Marcar ponto", com CTA para criar registro ali.
+  Widget _buildSelectedBodyCard() {
+    final cs = Theme.of(context).colorScheme;
+    final body = _selectedBody!;
     return Align(
       alignment: Alignment.bottomCenter,
-      child: SizedBox(
-        height: 132,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          itemCount: _waterBodies.length,
-          itemBuilder: (context, index) {
-            final body = _waterBodies[index];
-            final selected = index == _selectedIndex;
-            return GestureDetector(
-              onTap: () => _selectBody(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 260,
-                margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: selected ? AppColors.primary : Colors.transparent,
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.water_drop,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            body.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      body.waterType.label,
-                      style: const TextStyle(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: Text(
-                        'Geometria ${body.geometryType ?? "desconhecida"}'
-                        '${body.osmId == null ? "" : " • OSM ${body.osmId}"}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black54,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _showDetails(body),
-                      child: const Row(
-                        children: [
-                          Text(
-                            'Ver detalhes',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            color: AppColors.primary,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: _SelectionCard(
+          background: cs.surface,
+          borderColor: AppColors.primary.withValues(alpha: 0.2),
+          child: _SelectionBody(
+            body: body,
+            onCreate: () => _openCatchFormForBody(body),
+            distanceLabel: null,
+            onClose: () => setState(() => _selectedBody = null),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildErrorBanner() {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
@@ -783,11 +673,11 @@ class _MapScreenState extends State<MapScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
+                  color: cs.shadow.withValues(alpha: 0.12),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -795,7 +685,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             child: Text(
               _error!,
-              style: const TextStyle(color: Colors.black87),
+              style: TextStyle(color: cs.onSurface),
               textAlign: TextAlign.center,
             ),
           ),
@@ -805,22 +695,23 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildEmptyState() {
-    return const SafeArea(
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
       child: Align(
         alignment: Alignment.center,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.all(Radius.circular(18)),
+              color: cs.surface,
+              borderRadius: const BorderRadius.all(Radius.circular(18)),
             ),
             child: Padding(
-              padding: EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
               child: Text(
                 'Nenhum corpo d\'água nesta área.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
+                style: TextStyle(color: cs.onSurfaceVariant),
               ),
             ),
           ),
@@ -830,6 +721,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildZoomHint() {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Align(
         alignment: Alignment.center,
@@ -837,23 +729,23 @@ class _MapScreenState extends State<MapScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.94),
+              color: cs.surface.withValues(alpha: 0.94),
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
+                  color: cs.shadow.withValues(alpha: 0.12),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: const Padding(
-              padding: EdgeInsets.all(18),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
               child: Text(
                 'Aproxime para ver os rios.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.black87,
+                  color: cs.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -865,23 +757,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildNearestCard() {
+    final cs = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.bottomCenter,
       child: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 150),
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
           child: _nearestStatus == _NearestStatus.loading
               ? _SelectionCard(
                   key: const ValueKey('loading'),
-                  background: Colors.white,
+                  background: cs.surface,
                   borderColor: AppColors.secondary.withValues(alpha: 0.3),
                   child: const _SelectionLoading(),
                 )
               : _nearestStatus == _NearestStatus.found && _nearestBody != null
               ? _SelectionCard(
                   key: const ValueKey('found'),
-                  background: Colors.white,
+                  background: cs.surface,
                   borderColor: AppColors.primary.withValues(alpha: 0.2),
                   child: _SelectionBody(
                     body: _nearestBody!,
@@ -893,8 +786,8 @@ class _MapScreenState extends State<MapScreen> {
                 )
               : _SelectionCard(
                   key: const ValueKey('empty'),
-                  background: Colors.white,
-                  borderColor: Colors.red.withValues(alpha: 0.28),
+                  background: cs.surface,
+                  borderColor: cs.error.withValues(alpha: 0.28),
                   child: _SelectionEmpty(
                     message: _nearestStatus == _NearestStatus.error
                         ? (_nearestError ?? 'Falha ao buscar água próxima.')
@@ -932,27 +825,32 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   List<Marker> get _markers {
+    // Pins dos corpos d'água só aparecem com zoom suficiente; mais longe,
+    // só a geometria fica visível para não poluir o mapa.
+    final showBodyPins = !_markingMode && _cameraZoom >= _markerMinZoom;
     final markers = <Marker>[
-      for (var i = 0; i < _waterBodies.length; i++)
-        Marker(
-          point:
-              _waterBodies[i].centerLocation ??
-              _fallbackCenter(_waterBodies[i]),
-          width: 46,
-          height: 46,
-          child: GestureDetector(
-            onTap: () => _selectBody(i),
-            child: _MapPin(selected: i == _selectedIndex),
+      if (showBodyPins)
+        for (final body in _waterBodies)
+          Marker(
+            point: body.centerLocation ?? _fallbackCenter(body),
+            width: MapMarker.footprint,
+            height: MapMarker.footprint,
+            child: GestureDetector(
+              onTap: () => _selectBody(body),
+              child: MapMarker(
+                kind: MapMarkerKind.waterBody,
+                selected: _selectedBody?.id == body.id,
+              ),
+            ),
           ),
-        ),
     ];
 
     if (_markingMode && _draftPoint != null) {
       markers.add(
         Marker(
           point: _draftPoint!,
-          width: 54,
-          height: 68,
+          width: 44,
+          height: 44,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onPanUpdate: (details) => _moveDraftByDelta(details.delta),
@@ -978,21 +876,13 @@ class _MapScreenState extends State<MapScreen> {
           record.location ??
           record.waterBody.centerLocation ??
           _fallbackCenter(record.waterBody);
-      final approximate =
-          record.location == null ||
-          (!record.mine &&
-              record.locationVisibility == LocationVisibility.riverOnly);
       return Marker(
         point: point,
-        width: 42,
-        height: 42,
+        width: MapMarker.footprint,
+        height: MapMarker.footprint,
         child: GestureDetector(
           onTap: () => _openCatchDetail(record),
-          child: Icon(
-            approximate ? Icons.place_outlined : Icons.set_meal,
-            color: approximate ? Colors.orange : AppColors.deep,
-            size: approximate ? 34 : 30,
-          ),
+          child: const MapMarker(kind: MapMarkerKind.catchRecord),
         ),
       );
     }).toList();
@@ -1105,6 +995,7 @@ class _SelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -1115,7 +1006,7 @@ class _SelectionCard extends StatelessWidget {
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: cs.shadow.withValues(alpha: 0.12),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -1159,16 +1050,24 @@ class _SelectionLoading extends StatelessWidget {
 class _SelectionBody extends StatelessWidget {
   final WaterBody body;
   final VoidCallback onCreate;
-  final String distanceLabel;
+
+  /// Distância até o ponto marcado. Nulo quando o card vem de um toque direto
+  /// no corpo d'água (sem ponto de referência).
+  final String? distanceLabel;
+
+  /// Quando informado, exibe um botão de fechar no canto do card.
+  final VoidCallback? onClose;
 
   const _SelectionBody({
     required this.body,
     required this.onCreate,
     required this.distanceLabel,
+    this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -1187,20 +1086,29 @@ class _SelectionBody extends StatelessWidget {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              Text(
-                distanceLabel,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.deep,
+              if (distanceLabel != null)
+                Text(
+                  distanceLabel!,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                  ),
                 ),
-              ),
+              if (onClose != null)
+                IconButton(
+                  onPressed: onClose,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: Icon(Icons.close, color: cs.onSurfaceVariant, size: 22),
+                ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
             '${body.waterType.label}${body.source == null ? "" : " • ${body.source}"}'
             '${body.osmId == null ? "" : " • OSM ${body.osmId}"}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -1228,6 +1136,7 @@ class _SelectionEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -1238,14 +1147,17 @@ class _SelectionEmpty extends StatelessWidget {
             children: [
               Icon(
                 Icons.warning_amber_rounded,
-                color: onCreate == null ? Colors.red : AppColors.secondary,
+                color: onCreate == null ? cs.error : AppColors.secondary,
                 size: 28,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
                 ),
               ),
             ],
@@ -1256,7 +1168,7 @@ class _SelectionEmpty extends StatelessWidget {
             child: FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                disabledBackgroundColor: Colors.black12,
+                disabledBackgroundColor: cs.surfaceContainerHighest,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: onCreate,
@@ -1269,42 +1181,45 @@ class _SelectionEmpty extends StatelessWidget {
   }
 }
 
+/// Handle de edição do ponto sendo marcado (modo "Marcar ponto"). É um alvo
+/// circular vermelho com miolo branco — arrastável e propositalmente distinto
+/// dos marcadores de dados (ver [MapMarker]), sinalizando "você está aqui".
 class _DraftPin extends StatelessWidget {
   const _DraftPin();
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.location_on,
-          color: Colors.redAccent,
-          size: 54,
-          shadows: [
-            Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: cs.error,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.45),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
-        Icon(Icons.circle, color: Colors.white, size: 12),
-      ],
-    );
-  }
-}
-
-class _MapPin extends StatelessWidget {
-  final bool selected;
-
-  const _MapPin({required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(
-      Icons.location_on,
-      color: selected ? AppColors.primary : AppColors.deep,
-      size: selected ? 46 : 38,
-      shadows: const [
-        Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
-      ],
+        // Miolo branco intencional, marcando o ponto exato.
+        child: const Center(
+          child: SizedBox(
+            width: 8,
+            height: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

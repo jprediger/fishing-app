@@ -14,6 +14,13 @@ class AppColors {
   static const Color deep = Color(0xFF073B4C); // azul profundo
   static const Color sand = Color(0xFFF2C14E); // detalhe areia/sol
 
+  // Cores semânticas dos marcadores do mapa: nomeadas pelo papel (não pela
+  // marca crua) para que a paleta de marcadores evolua num só lugar. Usadas
+  // pelo design system de marcadores (ver `widgets/map_marker.dart`).
+  static const Color markerWaterBody = secondary; // corpos d'água
+  static const Color markerCatch = deep; // registros de pesca
+  static const Color markerEstablishment = sand; // estabelecimentos (futuro)
+
   /// Fundo claro legado. Mantido por compatibilidade; prefira
   /// `colorScheme.surface` para responder ao tema.
   static const Color surface = Color(0xFFF3F6F8);
