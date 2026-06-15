@@ -2,11 +2,12 @@
 
 - **Status:** Proposto
 - **Data:** 2026-06-14
-- **Relacionado:** [Spec 0001](../specs/0001-registro-de-pesca.md),
-  [ADR-0001 (PostGIS)](../adr/0001-pontos-de-pesca-postgis.md),
-  [ADR-0002 (privacidade do local)](../adr/0002-privacidade-do-local-de-pesca.md),
-  [Plano 0001 (water_body + seed OSM)](./0001-pontos-de-pesca-seed-osm.md),
-  [Plano 0003 (seed espécies RS)](./0003-seed-especies-rs.md)
+- **Relacionado:** [Spec 0001](../../specs/0001-registro-de-pesca.md),
+  [ADR-0001 (PostGIS)](../../adr/0001-pontos-de-pesca-postgis.md),
+  [ADR-0002 (privacidade do local)](../../adr/0002-privacidade-do-local-de-pesca.md),
+  [Plano 0001 (water_body + seed OSM)](../done/0001-pontos-de-pesca-seed-osm.md),
+  [Plano 0003 (seed espécies RS)](../done/0003-seed-especies-rs.md),
+  [Plano 0005 (nearest + marcar ponto)](./0005-nearest-marcar-ponto-e-mapa-real.md)
 
 ## Objetivo
 
@@ -19,10 +20,19 @@ servidor. Inclui backend (entidades, endpoints, upload, clima) e o fluxo no app.
 
 - **Espécies (`fish`):** catálogo pronto e **semeado** (plano 0003, `V4__seed_fish_rs.sql`).
   `GET /api/fish` paginado, exige auth. → dependência **satisfeita**.
-- **`water_body` (PostGIS):** **em implementação agora** (plano 0001 *Em
-  andamento*). É **pré-requisito**: `catch_record.water_body_id` é FK NOT NULL e a
-  geometria exige PostGIS habilitado. → esta feature começa quando o 0001 expuser
-  `water_body` + PostGIS.
+- **`water_body` (PostGIS):** **finalizado** (plano 0001 *Implementado*;
+  `V5__enable_postgis_and_water_bodies.sql`). Backend expõe `GET /api/water-bodies`
+  (`findInBbox`, com `zoom`/simplify/limit) **e `GET /api/water-bodies/nearest?lat&lon`**
+  (corpo d'água mais próximo dentro do raio + `distanceMeters`; 404 fora do raio).
+  Seed OSM via `OverpassWaterBodySeeder`. → dependência **satisfeita**:
+  `catch_record.water_body_id` (FK NOT NULL) e `location` (PostGIS) prontos. O
+  `nearest` é o que **resolve `waterBodyId` + ponto** antes do form (ver
+  [App](#app--fluxo-de-criação)).
+  > **Estado (2026-06-14):** Plano 0005 **Implementado** (`done/`) — `nearest`/`zoom`
+  > no backend e, no app, `map_screen` com modo "marcar ponto" (pin solto + card ao
+  > vivo + CTA "Criar registro aqui" como **stub**) e `mock_data.dart` removido. O
+  > **ponto de entrada** deste form já existe; falta só trocar o stub do CTA pelo
+  > push do wizard. *(Mudanças do 0005 ainda uncommitted no worktree.)*
 - **Auth/usuário:** JWT (resource-server). `authentication.getName()` = e-mail do
   usuário (subject do JWT); o padrão de resolver usuário por e-mail já existe
   (`MeController:30`, `MeService.getByEmail`). User → tabela `users`.
@@ -34,27 +44,32 @@ servidor. Inclui backend (entidades, endpoints, upload, clima) e o fluxo no app.
 - **Upload de arquivos:** não há nada (nem `ResourceHandler`, nem dir de uploads,
   nem multipart). → construir do zero.
 - **App:** tem `flutter_map ^7`, `latlong2`, `http`. **Falta `image_picker`**
-  (fotos). `map_screen.dart` ainda usa pontos hardcoded (some com o plano 0001).
+  (fotos). `map_screen.dart` já carrega `water_body` **do backend** por viewport e
+  **tem o modo "marcar ponto"** (Plano 0005) com CTA "Criar registro aqui" como
+  **stub** — é o ponto de entrada deste form. `mock_data.dart` **removido** (app
+  fala sempre com o backend real; `client` segue injetável nos testes).
 - **Conflito de `V2` (plano 0001):** **já resolvido** — existe só uma `V2`
   (`V2__create_users.sql`). Sem trava de banco limpo.
 - **Stack:** Spring Boot **4.0.6**, Jackson **3** (`tools.jackson`), JPA
-  auditoria (`@CreatedDate`), testes com Testcontainers (`postgres:16` — vira
-  `postgis/postgis` no plano 0001).
+  auditoria (`@CreatedDate`), testes com Testcontainers (**`postgis/postgis:16-3.4`**,
+  já em uso desde o plano 0001).
 
 ## Pré-requisitos / ordem entre planos
 
-1. **Plano 0001** (PostGIS + `water_body` + seed OSM) — **em andamento**,
-   bloqueante. Sem ele não há `water_body` (FK) nem PostGIS para `location`.
-2. **Plano 0003** (seed espécies) — **pronto** (FK `species_id`).
-3. Esta feature.
+1. **Plano 0001** (PostGIS + `water_body` + seed OSM) — **Implementado**
+   (`done/`). `water_body` (FK) e PostGIS (`location`) prontos. → satisfeito.
+2. **Plano 0003** (seed espécies) — **Implementado** (`done/`). FK `species_id`. → satisfeito.
+3. **Plano 0005** (`nearest` + marcar ponto + mapa real) — **Implementado**
+   (`done/`). O **ponto de entrada** do form (CTA "Criar registro aqui") já existe
+   como stub no `map_screen`; resta trocar o stub pelo push do wizard. → satisfeito.
+4. Esta feature.
 
 ### Numeração Flyway
 
-- Estado atual: `V1`, `V2`, `V3`, `V4` (este último = seed espécies do plano 0003).
-- O plano 0001 foi escrito reservando **`V4`** para PostGIS/`water_body`, mas
-  **`V4` já foi usado** pelo seed. → o plano 0001 deve usar **`V5`** e **esta
-  feature `V6`**. Confirme a próxima versão livre no momento de implementar; o
-  Flyway, por padrão, não aplica versões fora de ordem.
+- Estado atual no disco: `V1`, `V2`, `V3`, `V4` (seed espécies, plano 0003),
+  **`V5__enable_postgis_and_water_bodies.sql`** (plano 0001, já aplicado). → a
+  próxima versão livre é **`V6`** (confirmado), usada por esta feature. O Flyway,
+  por padrão, não aplica versões fora de ordem.
 
 ## Modelo de dados
 
@@ -127,11 +142,16 @@ CREATE INDEX idx_catch_photo_record ON catch_photo (catch_record_id);
   `fishingMethod`, `purpose`, `caughtAt`. Validação Bean Validation (`@NotNull`
   nos obrigatórios, faixas em peso/comprimento). **Reutilizado no `PUT`** (edição).
 - `CatchResponseDTO`: dados + `species` (resumo do fish) + `weather` + `photos[]`
-  + `waterBody` (resumo) + `location` **condicional** (privacidade).
-- `LocationDTO {lat, lon}` na entrada; na saída a geometria vai como **GeoJSON**
-  ou `{lat, lon}` — reutilizar a decisão de serialização de geometria do plano
-  0001 (JTS + Jackson 3: `ST_AsGeoJSON` na query nativa **ou** serializer custom;
-  `jackson-datatype-jts` é Jackson 2 e **não** serve aqui).
+  + `waterBody` (resumo + centroide) + `location` **condicional** (privacidade) +
+  **`mine` (boolean)**. O `mine` é essencial no app: como `location` é **omitido**
+  para terceiros em `RIVER_ONLY`, o app **não consegue inferir** "sou o dono" pela
+  presença do ponto → o backend declara explicitamente (sem vazar e-mail do dono).
+  Habilita a ação de editar/excluir e o pin no ponto exato vs. aproximado.
+- `LocationDTO {lat, lon}` na entrada; na saída, **seguir a decisão já tomada no
+  plano 0001 (Implementado): `ST_AsGeoJSON` na query nativa** (o
+  `WaterBodyRepository` já devolve `geomGeoJson` + `centerLon/centerLat` assim).
+  Reusar o mesmo padrão para `catch_record.location`. (`jackson-datatype-jts` é
+  Jackson 2 e **não** serve.)
 
 ### Service — `CatchService`
 - `create(dto, requesterEmail)`: resolve `User` por e-mail; valida FKs
@@ -212,21 +232,113 @@ CREATE INDEX idx_catch_photo_record ON catch_photo (catch_record_id);
   **centroide do `water_body`** (não o `location`), inclusive no filtro espacial.
 
 ## App — fluxo de criação
+
+### Ponto de partida (vem do Plano 0005)
+
+O **local e o `water_body` já chegam resolvidos**: no modo "marcar ponto" do mapa
+(Plano 0005, **já implementado**) o usuário solta o pin, o `nearest` resolve o
+corpo d'água ao vivo e o CTA "Criar registro aqui" — hoje um **stub** no
+`map_screen` — passa a fazer `Navigator.push(CatchForm(point, waterBody))`. **A
+primeira tarefa do app nesta feature é trocar esse stub pelo push do wizard.** O
+formulário **abre já com `location {lat,lon}` + `waterBodyId`** — a seleção de
+rio/ponto **não** acontece dentro do form. O fluxo do usuário, ponta a ponta, é:
+**marcar no mapa → foto → detalhes → salvar**.
+
+### Deps e arquivos
 - **Deps:** adicionar `image_picker` (fotos). `flutter_map`/`latlong2` já existem.
-- `models/catch_record.dart`, `services/catch_service.dart` (molde do `FishService`,
-  com mock em `mock_data.dart`).
-- **Tela de criação** (multi-step ou form único): **selecionar o `water_body`** +
-  **marcar o ponto exato** no mapa (decidido: o **usuário define ambos no app** —
-  toca o corpo d'água e marca o `location`) → escolher visibilidade (exato/rio) →
-  selecionar espécie (consome `/api/fish`, picker do plano 0003) →
-  peso/comprimento/descrição → método + finalidade → fotos (`image_picker`) →
-  salvar. `caught_at` via date picker (default agora). O app envia `waterBodyId` +
-  `location {lat, lon}`.
-- **Tela de edição:** reusa o form de criação pré-preenchido; envia `PUT
-  /api/catches/{id}`; permite adicionar/remover fotos (endpoints próprios). Só o
-  dono vê a ação de editar.
-- **No mapa:** marcadores das pescas (sobre os `water_body` do plano 0001);
-  `RIVER_ONLY` aparece no centroide do corpo d'água, sinalizado como aproximado.
+  (Mock removido no Plano 0005 — o `catch_service` fala direto com o backend.)
+- `models/catch_record.dart`, `models/catch_draft.dart` (estado mutável do form,
+  um `ChangeNotifier`), enums (`FishingMethod`, `FishingPurpose`,
+  `LocationVisibility`, `WeatherCondition`) espelhando o backend (padrão de
+  `FishType`/`WaterType`).
+- `services/catch_service.dart` (molde do `FishService`/`WaterBodyService`,
+  `client` injetável): `create`, upload de fotos, `getById`, `list`, `mine`,
+  `update`, `delete`.
+- `screens/catch_form/` — host do wizard + 3 widgets de passo;
+  `screens/catch_detail_screen.dart`; **extrair um species picker reutilizável**
+  da `search_screen` (lista/busca sobre `/api/fish`).
+
+### Wizard de 3 passos (decidido)
+
+Estado num único `CatchDraft` para ir/voltar sem perder dado; indicador de
+progresso no topo; botão "Continuar"/"Salvar" fixo no rodapé. **Regra de
+obrigatoriedade é do app** (o backend é 2 passos e não exige foto): obrigatórios =
+**foto (≥1)**, **espécie**, **método**, **finalidade**, **visibilidade**
+(local+rio já vêm do mapa). O resto é opcional → o caminho rápido tem poucos toques.
+
+1. **Passo 1 — "A captura":** fotos (**obrigatórias, ≥1**; `image_picker`, câmera
+   ou galeria, até 8, 1ª = capa, reordenáveis) + **espécie** (obrigatória, via
+   species picker sobre `/api/fish`) + `caught_at` (date/time picker, default
+   agora). "Continuar" habilita com **foto + espécie**.
+2. **Passo 2 — "Detalhes":** peso e comprimento (numéricos, opcionais, unidade
+   visível g/cm) + **método** (chips/dropdown) + **finalidade** esporte/consumo
+   (`SegmentedButton`) + descrição (multiline, opcional).
+3. **Passo 3 — "Local e privacidade / Revisão":** mini-mapa read-only com o pin +
+   nome do rio + `~Xm` (do `nearest`); **visibilidade** (`Exato` × `Somente o
+   rio`) com texto claro do efeito na privacidade; chip de **clima** (automático,
+   best-effort — "buscando clima…" → resultado, **nunca bloqueia o salvar**);
+   resumo + **"Salvar registro"**.
+
+### Salvar (orquestração do 2-passos)
+
+`POST /api/catches` cria o registro → com o `id`, sobe as fotos
+(`POST /{id}/photos`) com barra de progresso, num overlay único. **Se uma foto
+falhar, o registro já existe** — não descartar o trabalho: oferecer "reenviar
+fotos" (as fotos estão locais, o retry é confiável). Como foto é obrigatória só no
+app, esse caminho pode deixar um registro recém-criado sem foto até o reenvio —
+sinalizar isso ao usuário. Pós-salvar: volta ao mapa com o marcador novo (ou abre
+a `catch_detail_screen`).
+
+### Edição
+- Reusa o mesmo wizard pré-preenchido a partir de um `CatchRecord`; envia `PUT
+  /api/catches/{id}`. **Fotos na edição** usam os endpoints individuais ao vivo
+  (`POST /{id}/photos`, `DELETE /{id}/photos/{photoId}`), **não** o lote do create.
+  Só o dono vê a ação de editar.
+
+### Tela de detalhe (`screens/catch_detail_screen.dart`)
+
+Aberta a partir de: marcador no mapa, lista "minhas pescas" (aba "Eu"), ou logo
+após salvar. Carrega `GET /api/catches/{id}` (a privacidade já vem aplicada no
+JSON — pode **não** ter `location`).
+
+- **Fotos (hero):** carrossel no topo (`PageView` + indicador); tap → viewer
+  fullscreen com zoom. **Servidas de `/uploads/**`, que é `authenticated()`** →
+  `Image.network(url, headers: {Authorization: Bearer <token>})` (o `Image.network`
+  não passa pelo `AuthHttpClient`; injetar o header manualmente, lendo o token do
+  `TokenStorage`/`AuthController`). Placeholder/erro como em `_FishAvatar`.
+- **Cabeçalho:** espécie (ícone + nome) + badges de **método** e **finalidade**.
+- **Medidas:** peso/comprimento quando presentes (linhas no estilo `_DetailRow`).
+- **Clima:** bloco com temperatura/condição/vento/umidade/pressão — **só os campos
+  não nulos** (clima é best-effort; pode vir todo nulo → ocultar o bloco).
+- **Data:** `caught_at` formatada.
+- **Local (mini-mapa read-only):**
+  - `mine == true` **ou** `EXACT` → pin no **ponto exato** + nome do rio.
+  - terceiro + `RIVER_ONLY` → **sem ponto exato** (o JSON não traz `location`):
+    mostra o `water_body` (centroide/geometria) com aviso **"local aproximado
+    (somente o rio)"**. O app decide pela **ausência** de `location`, não adivinha.
+- **Descrição** (se houver).
+- **Ações do dono** (`mine == true`): **Editar** (push do wizard pré-preenchido) e
+  **Excluir** (dialog de confirmação → `DELETE /api/catches/{id}` → volta e remove
+  o marcador do mapa). Terceiro não vê essas ações (e o backend devolve 403/404).
+
+### No mapa — marcadores de pesca
+
+- **Fonte:** `GET /api/catches?bbox=...` (paginado, privacidade aplicada),
+  carregado por viewport reusando o **debounce + cancelamento de obsoletos** do
+  Plano 0005 (frente C). Filtro opcional por `speciesId`.
+- **Posição do marcador:**
+  - `EXACT`/dono → `location` exato.
+  - terceiro + `RIVER_ONLY` → **centroide do `water_body`** (já vem do backend, que
+    omite `location`), com estilo **"aproximado"** (ícone com halo/tracejado).
+- **Distinção visual:** marcador de **pesca** ≠ marcador de **corpo d'água** (já há
+  `_MapPin`) — ícone de peixe vs. gota, ou cor distinta.
+- **Agregação:** vários `RIVER_ONLY` no mesmo rio empilham no mesmo centroide →
+  marcador com **badge de contagem** (ou cluster) para não sobrepor.
+- **Interação:** tap → bottom sheet resumido (foto capa + espécie + data + "ver
+  detalhes") → push da `catch_detail_screen`.
+- **Convivência com o modo "marcar ponto" (Plano 0005):** ao entrar no modo de
+  criação, **esmaecer/ocultar** os marcadores de pesca para não competir com o pin
+  de rascunho.
 
 ## Testes
 - **Service (mockito):** create resolve user/FKs e monta Point; clima nulo quando
@@ -239,10 +351,17 @@ CREATE INDEX idx_catch_photo_record ON catch_photo (catch_record_id);
   inválido 400; remoção de foto pelo dono.
 - **Migration:** aplica em banco limpo (depende da V5/PostGIS); FKs e índices
   presentes.
-- **App:** widget test do fluxo de criação com `catch_service` mockado.
+- **App:** widget test por passo do wizard (validação local: "Continuar"
+  desabilitado sem foto/espécie no passo 1; método/finalidade obrigatórios) +
+  caminho feliz completo (3 passos → salvar) com `catch_service` mockado; falha de
+  upload de foto mantém o registro e mostra o "reenviar". **Tela de detalhe:**
+  `mine == true` exibe Editar/Excluir e pin exato; terceiro+`RIVER_ONLY` (JSON sem
+  `location`) esconde as ações e mostra "local aproximado". **Marcadores:** pesca
+  `EXACT` no ponto, `RIVER_ONLY` no centroide; tap abre o resumo.
 
 ## Ordem de execução
-1. **Plano 0001** concluído (PostGIS + `water_body`). *(bloqueante)*
+1. **Planos 0001 e 0005** concluídos (`done/`) — PostGIS + `water_body` + `nearest`
+   + ponto de entrada "marcar ponto". *(bloqueantes — satisfeitos)*
 2. Migration `V6` (catch_record + catch_photo).
 3. Enums + entidades + repos.
 4. `CatchService` + DTOs + `toDto(requester)` (privacidade).
@@ -251,8 +370,12 @@ CREATE INDEX idx_catch_photo_record ON catch_photo (catch_record_id);
 6. Upload (config multipart + `ResourceHandler` + validação + deleção de arquivo +
    remoção de foto individual).
 7. Cliente Open-Meteo (inline, best-effort) + mapeamento WMO.
-8. App: deps (`image_picker`), models, service+mock, telas de criação **e edição**,
-   marcadores no mapa.
+8. App: deps (`image_picker`), models (`catch_record`, `catch_draft`, enums),
+   `catch_service`, species picker extraído da `search_screen`, **wizard de 3
+   passos** (criação) + tela de edição, orquestração do salvar (POST + upload com
+   retry), **`catch_detail_screen`** (fotos via header de auth; ações do dono por
+   `mine`), **marcadores de pesca no mapa** (EXACT no ponto / RIVER_ONLY no
+   centroide; resumo → detalhe).
 9. Testes (em paralelo a cada camada).
 
 ## Critérios de aceite (da spec)
@@ -274,11 +397,16 @@ CREATE INDEX idx_catch_photo_record ON catch_photo (catch_record_id);
 - **Limites de upload:** jpeg/png/webp, **8 MB/arquivo**, **8 fotos/registro**.
 - **Edição:** **há** `PUT /api/catches/{id}` (dono) **e tela de edição** no app;
   remoção de foto individual via `DELETE /api/catches/{id}/photos/{photoId}`.
+- **Fluxo no app:** local + `water_body` chegam resolvidos do Plano 0005 (não se
+  escolhem no form). **Wizard de 3 passos** (Captura → Detalhes → Local/privacidade
+  + revisão) com `CatchDraft` persistente. **Foto obrigatória (≥1) no app**
+  (regra do front; o backend, 2 passos, não exige). `caught_at` default agora,
+  manual (sem EXIF nesta iteração).
 
 ## Questões em aberto
 
 1. **Corte forecast×archive** da Open-Meteo e cobertura para datas muito recentes
    (últimas horas) — validar empiricamente o `past_days`.
-2. **Serialização de geometria (JTS + Jackson 3)** — herdada do plano 0001;
-   fechar a abordagem lá e reusar aqui (`location` Point). *(jackson-datatype-jts
-   é Jackson 2 e não serve.)*
+2. ~~**Serialização de geometria (JTS + Jackson 3)**~~ — **resolvida no plano 0001
+   (Implementado): `ST_AsGeoJSON` na query nativa** (vide `WaterBodyRepository`).
+   Reusar o mesmo padrão para `catch_record.location`.
