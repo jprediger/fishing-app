@@ -11,6 +11,7 @@ import 'package:mobile_app/models/fish.dart';
 import 'package:mobile_app/screens/catch_form_screen.dart';
 import 'package:mobile_app/screens/map_screen.dart';
 import 'package:mobile_app/services/catch_service.dart';
+import 'package:mobile_app/services/location_service.dart';
 import 'package:mobile_app/services/water_body_service.dart';
 import 'package:mobile_app/theme/app_colors.dart';
 import 'package:mobile_app/widgets/map_marker.dart';
@@ -94,6 +95,8 @@ Widget _wrap(
   CatchService? catchService,
   double? debugInitialZoom,
   LatLng? draftPoint,
+  LocationService? locationService,
+  ValueChanged<LatLng>? onUserLocationCentered,
 }) => MaterialApp(
   home: MapScreen(
     waterBodyService: waterBodyService,
@@ -101,8 +104,49 @@ Widget _wrap(
     showTiles: false,
     debugInitialZoom: debugInitialZoom,
     debugInitialDraftPoint: draftPoint,
+    locationService: locationService,
+    debugOnUserLocationCentered: onUserLocationCentered,
   ),
 );
+
+class FakeLocationService implements LocationService {
+  FakeLocationService({
+    this.serviceEnabled = true,
+    this.checkedPermission = AppLocationPermission.denied,
+    this.requestedPermission = AppLocationPermission.denied,
+    this.location,
+  });
+
+  bool serviceEnabled;
+  AppLocationPermission checkedPermission;
+  AppLocationPermission requestedPermission;
+  UserLocation? location;
+  int checkPermissionCalls = 0;
+  int requestPermissionCalls = 0;
+  int getCurrentLocationCalls = 0;
+
+  @override
+  Future<AppLocationPermission> checkPermission() async {
+    checkPermissionCalls++;
+    return checkedPermission;
+  }
+
+  @override
+  Future<UserLocation?> getCurrentLocation() async {
+    getCurrentLocationCalls++;
+    return location;
+  }
+
+  @override
+  Future<bool> isServiceEnabled() async => serviceEnabled;
+
+  @override
+  Future<AppLocationPermission> requestPermission() async {
+    requestPermissionCalls++;
+    checkedPermission = requestedPermission;
+    return requestedPermission;
+  }
+}
 
 void main() {
   testWidgets('pin solto mostra corpo d\'água mais próximo', (tester) async {
@@ -168,6 +212,115 @@ void main() {
     expect(find.text('Lago Guaíba'), findsOneWidget);
     expect(find.textContaining('Criar registro aqui'), findsOneWidget);
   });
+
+  testWidgets('exibe marcador do usuário quando a permissão já foi concedida', (
+    tester,
+  ) async {
+    final client = MockClient((request) async {
+      if (request.url.path == '/api/catches') {
+        return http.Response(
+          '[]',
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+
+      return http.Response(
+        _waterBodiesJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+    final locationService = FakeLocationService(
+      checkedPermission: AppLocationPermission.whileInUse,
+      location: UserLocation(
+        coordinates: const LatLng(-30.031, -51.230),
+        timestamp: DateTime.now(),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        WaterBodyService(client: client, baseUrl: 'http://test.local'),
+        catchService: CatchService(
+          client: client,
+          baseUrl: 'http://test.local',
+        ),
+        locationService: locationService,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('user-location-marker')), findsOneWidget);
+    expect(locationService.requestPermissionCalls, 0);
+    expect(locationService.getCurrentLocationCalls, 1);
+  });
+
+  testWidgets(
+    'botão de centralizar pede permissão, move para o usuário e evita refetch imediato',
+    (tester) async {
+      final client = MockClient((request) async {
+        if (request.url.path == '/api/catches') {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+
+        return http.Response(
+          _waterBodiesJson,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final locationService = FakeLocationService(
+        checkedPermission: AppLocationPermission.denied,
+        requestedPermission: AppLocationPermission.whileInUse,
+        location: UserLocation(
+          coordinates: const LatLng(-30.044, -51.201),
+          timestamp: DateTime.now(),
+        ),
+      );
+      final centeredPoints = <LatLng>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          WaterBodyService(client: client, baseUrl: 'http://test.local'),
+          catchService: CatchService(
+            client: client,
+            baseUrl: 'http://test.local',
+          ),
+          locationService: locationService,
+          onUserLocationCentered: centeredPoints.add,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('user-location-marker')), findsNothing);
+
+      await tester.tap(find.byTooltip('Centralizar em mim'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(locationService.requestPermissionCalls, 1);
+      expect(locationService.getCurrentLocationCalls, 1);
+      expect(
+        find.byKey(const ValueKey('user-location-marker')),
+        findsOneWidget,
+      );
+      expect(centeredPoints, hasLength(1));
+      expect(centeredPoints.single.latitude, closeTo(-30.044, 0.0001));
+      expect(centeredPoints.single.longitude, closeTo(-51.201, 0.0001));
+
+      await tester.tap(find.byTooltip('Centralizar em mim'));
+      await tester.pumpAndSettle();
+
+      expect(locationService.getCurrentLocationCalls, 1);
+      expect(centeredPoints, hasLength(2));
+    },
+  );
 
   testWidgets('após salvar registro no popup o mapa volta ao default', (
     tester,

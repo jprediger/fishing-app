@@ -44,11 +44,12 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 | Termo | Significado |
 |---|---|
 | **Fish / Espécie** | Espécie de peixe no catálogo (não é um peixe individual). |
+| **Descoberta por espécie** | Fluxo em que o usuário entra por uma **Espécie** e explora **Corpos d'água** ou **Registros de pesca** associados a ela. |
 | **FishType** | Classificação da água da espécie: `FRESHWATER`, `SALTWATER`, `BRACKISH`. |
 | **Corpo d'água / WaterBody** | Camada de referência geográfica (rio, lago, lagoa, açude, represa) populada por seed do OSM. A ser modelado. |
 | **WaterType** | Tipo de corpo d'água: `RIVER`, `LAKE`, `LAGOON`, `RESERVOIR`, `POND`. |
 | **Registro de pesca / CatchRecord** | Evento do usuário: 1 peixe pescado, ligado a um corpo d'água + ponto no mapa, com fotos, detalhes e clima. |
-| **Estabelecimento / Establishment** | Ponto de interesse de pesca (loja, pesqueiro, marina, rampa etc.) que pode ser associado opcionalmente pelo usuário a um registro de pesca, sem substituir o corpo d'água. |
+| **Estabelecimento / Establishment** | Ponto de interesse de pesca (loja, pesqueiro, marina, rampa etc.) que pode ser associado opcionalmente pelo usuário a um registro de pesca quando a pesca ocorreu naquele estabelecimento ou em seu entorno imediato, sem substituir o corpo d'água. |
 | **LocationVisibility** | Privacidade do ponto: `EXACT` (público) \| `RIVER_ONLY` (só o rio é público). Ver [ADR-0002](./adr/0002-privacidade-do-local-de-pesca.md). |
 | **FishingMethod** | Método de pescaria: `ARREMESSO`, `FLY`, `CORRICO`, `FUNDO`, `BOIA`, `OUTRO`. |
 | **FishingPurpose** | Finalidade: `SPORT` (esportiva) \| `CONSUMPTION` (consumo). |
@@ -61,6 +62,27 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 
 - Um **CatchRecord** pertence a exatamente um **WaterBody**
 - Um **CatchRecord** pode ser associado a zero ou um **Establishment**, sempre por escolha explícita do usuário
+- A navegação de descoberta por **Espécie** pode listar **Corpos d'água** ou **Registros de pesca** dessa espécie
+- A **Descoberta por espécie** começa por uma **Espécie** e abre uma tela com resumo da espécie e resultados abaixo
+- A aba **Espécies** começa com uma lista pesquisável de **Espécies**; tocar em uma espécie abre a **Descoberta por espécie**
+- Um **CatchRecord** com **LocationVisibility = RIVER_ONLY** continua elegível para descoberta por **Espécie** e para agrupamento por **WaterBody**; apenas o ponto exato permanece oculto
+- A proximidade entre **CatchRecord** e **Establishment** serve para sugestão durante a criação, não para definir pertencimento
+- A associação entre **CatchRecord** e **Establishment** só é permitida quando o ponto da pesca está dentro de um raio curto do estabelecimento
+- Só **Establishments** das categorias **PESQUEIRO** e **CLUBE** podem receber associação explícita de um **CatchRecord**
+- Durante a criação, o app só oferece para associação os **Establishments** elegíveis que já estejam dentro do raio permitido
+- O raio permitido para associar **CatchRecord** a **Establishment** é definido no backend e exibido pelo app ao usuário
+- O valor inicial desse raio permitido é **200 m**
+- **Establishments** de categorias não associáveis continuam visíveis como pontos de interesse, mas não exibem ações de criar registro ou ver registros associados
+
+## Exemplo de diálogo
+
+> **Dev:** "Na aba de **Espécies**, o usuário vai ver aparições de traíra?"
+> **Especialista de domínio:** "Não usamos 'aparições'. O usuário escolhe uma **Espécie** e então vê **Registros de pesca** dessa espécie, cada um ligado a um **Corpo d'água**."
+
+## Ambiguidades sinalizadas
+
+- "aparição" foi usado para significar **Registro de pesca**; resolução: usar **Registro de pesca** quando o app mostrar capturas publicadas por usuários
+- "próximas" foi usado para sugerir proximidade geográfica; resolução: nesta fase, a descoberta por **Espécie** não depende da localização do usuário nem de distância real
 
 ## Comandos essenciais
 
