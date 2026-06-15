@@ -332,7 +332,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
         const SizedBox(height: 16),
         _SectionCard(
           title: 'Espécie',
-          subtitle: 'Seleção vinda do catálogo`.',
+          subtitle: 'Seleção vinda do catálogo.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
