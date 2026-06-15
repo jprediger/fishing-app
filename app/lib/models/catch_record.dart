@@ -104,10 +104,50 @@ class CatchPhoto {
   }
 }
 
+class CatchWeather {
+  final double? temperatureC;
+  final WeatherCondition? condition;
+  final double? windSpeedKmh;
+  final int? windDirectionDeg;
+  final int? humidityPct;
+  final double? pressureHpa;
+  final int? code;
+  final DateTime? capturedAt;
+  final String? source;
+
+  const CatchWeather({
+    this.temperatureC,
+    this.condition,
+    this.windSpeedKmh,
+    this.windDirectionDeg,
+    this.humidityPct,
+    this.pressureHpa,
+    this.code,
+    this.capturedAt,
+    this.source,
+  });
+
+  factory CatchWeather.fromJson(Map<String, dynamic> json) {
+    return CatchWeather(
+      temperatureC: (json['temperatureC'] as num?)?.toDouble(),
+      condition: json['condition'] == null
+          ? null
+          : WeatherCondition.fromApi(json['condition'] as String?),
+      windSpeedKmh: (json['windSpeedKmh'] as num?)?.toDouble(),
+      windDirectionDeg: (json['windDirectionDeg'] as num?)?.toInt(),
+      humidityPct: (json['humidityPct'] as num?)?.toInt(),
+      pressureHpa: (json['pressureHpa'] as num?)?.toDouble(),
+      code: (json['code'] as num?)?.toInt(),
+      capturedAt: DateTime.tryParse(json['capturedAt'] as String? ?? ''),
+      source: json['source'] as String?,
+    );
+  }
+}
+
 class CatchRecord {
   final int id;
   final WaterBody waterBody;
-  final LatLng location;
+  final LatLng? location;
   final LocationVisibility locationVisibility;
   final Fish species;
   final int? weightGrams;
@@ -117,8 +157,8 @@ class CatchRecord {
   final FishingPurpose purpose;
   final DateTime caughtAt;
   final List<CatchPhoto> photos;
-  final WeatherCondition? weatherCondition;
-  final double? weatherTemperatureC;
+  final CatchWeather? weather;
+  final bool mine;
 
   const CatchRecord({
     required this.id,
@@ -133,8 +173,8 @@ class CatchRecord {
     required this.purpose,
     required this.caughtAt,
     this.photos = const [],
-    this.weatherCondition,
-    this.weatherTemperatureC,
+    this.weather,
+    this.mine = false,
   });
 
   factory CatchRecord.fromJson(Map<String, dynamic> json) {
@@ -142,10 +182,12 @@ class CatchRecord {
     return CatchRecord(
       id: (json['id'] as num).toInt(),
       waterBody: WaterBody.fromJson(json['waterBody'] as Map<String, dynamic>),
-      location: LatLng(
-        (location?['lat'] as num?)?.toDouble() ?? 0,
-        (location?['lon'] as num?)?.toDouble() ?? 0,
-      ),
+      location: location == null
+          ? null
+          : LatLng(
+              (location['lat'] as num?)?.toDouble() ?? 0,
+              (location['lon'] as num?)?.toDouble() ?? 0,
+            ),
       locationVisibility: LocationVisibility.fromApi(
         json['locationVisibility'] as String?,
       ),
@@ -160,10 +202,12 @@ class CatchRecord {
           .whereType<Map<String, dynamic>>()
           .map(CatchPhoto.fromJson)
           .toList(),
-      weatherCondition: WeatherCondition.fromApi(
-        json['weatherCondition'] as String?,
-      ),
-      weatherTemperatureC: (json['weatherTemperatureC'] as num?)?.toDouble(),
+      weather:
+          json['weather'] is Map<String, dynamic> &&
+              (json['weather'] as Map<String, dynamic>).isNotEmpty
+          ? CatchWeather.fromJson(json['weather'] as Map<String, dynamic>)
+          : null,
+      mine: json['mine'] as bool? ?? false,
     );
   }
 }

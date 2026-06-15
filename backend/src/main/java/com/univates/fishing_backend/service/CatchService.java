@@ -42,6 +42,18 @@ public class CatchService {
     }
 
     @Transactional(readOnly = true)
+    public Page<CatchResponseDTO> findAll(Pageable pageable, String requesterEmail, Long speciesId, String bbox) {
+        if (bbox == null || bbox.isBlank()) {
+            return findAll(pageable, requesterEmail, speciesId);
+        }
+
+        Bbox viewport = Bbox.parse(bbox);
+        Page<CatchRecord> page = catchRepository.findAllInBbox(
+                viewport.minLon(), viewport.minLat(), viewport.maxLon(), viewport.maxLat(), speciesId, pageable);
+        return page.map(record -> toDto(record, requesterEmail));
+    }
+
+    @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findMine(Pageable pageable, String requesterEmail, Long speciesId) {
         Page<CatchRecord> page = speciesId == null
                 ? catchRepository.findByUser_Email(requesterEmail, pageable)
@@ -241,5 +253,26 @@ public class CatchService {
 
     private CatchPhotoResponseDTO toPhotoDto(CatchPhoto photo) {
         return new CatchPhotoResponseDTO(photo.getId(), photo.getFilePath(), photo.getPosition(), photo.getCreatedAt());
+    }
+
+    record Bbox(double minLon, double minLat, double maxLon, double maxLat) {
+        static Bbox parse(String bbox) {
+            String[] parts = bbox.split(",");
+            if (parts.length != 4) {
+                throw new IllegalArgumentException("bbox inválido. Use minLon,minLat,maxLon,maxLat");
+            }
+            try {
+                double minLon = Double.parseDouble(parts[0].trim());
+                double minLat = Double.parseDouble(parts[1].trim());
+                double maxLon = Double.parseDouble(parts[2].trim());
+                double maxLat = Double.parseDouble(parts[3].trim());
+                if (minLon >= maxLon || minLat >= maxLat) {
+                    throw new IllegalArgumentException("bbox inválido. Coordenadas fora de ordem");
+                }
+                return new Bbox(minLon, minLat, maxLon, maxLat);
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("bbox inválido. Coordenadas devem ser numéricas");
+            }
+        }
     }
 }

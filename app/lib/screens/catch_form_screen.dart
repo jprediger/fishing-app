@@ -1,27 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart';
 
+import '../models/catch_draft.dart';
+import '../models/catch_record.dart';
 import '../models/fish.dart';
-import '../models/water_body.dart';
+import '../services/catch_service.dart';
 import '../services/fish_service.dart';
 import 'fish_picker_sheet.dart';
 
-/// Primeira tela do wizard de registro de pesca.
+/// Wizard de registro de pesca.
 ///
-/// Nesta iteração ela valida o handoff do mapa e já integra seleção de
-/// espécie e fotos, deixando o resto do wizard para o próximo slice.
+/// Mantém o estado em [CatchDraft] para permitir ida e volta entre passos sem
+/// perder seleções locais.
 class CatchFormScreen extends StatefulWidget {
-  final LatLng point;
-  final WaterBody waterBody;
+  final CatchDraft draft;
+  final CatchService? catchService;
   final FishService? fishService;
+  final CatchRecord? editingRecord;
+  final Future<List<XFile>> Function()? photoPicker;
 
   const CatchFormScreen({
     super.key,
-    required this.point,
-    required this.waterBody,
+    required this.draft,
+    this.catchService,
     this.fishService,
+    this.editingRecord,
+    this.photoPicker,
   });
+
+  factory CatchFormScreen.create({
+    required CatchDraft draft,
+    CatchService? catchService,
+    FishService? fishService,
+    Future<List<XFile>> Function()? photoPicker,
+  }) {
+    return CatchFormScreen(
+      draft: draft,
+      catchService: catchService,
+      fishService: fishService,
+      photoPicker: photoPicker,
+    );
+  }
+
+  factory CatchFormScreen.edit({
+    required CatchRecord record,
+    CatchService? catchService,
+    FishService? fishService,
+    Future<List<XFile>> Function()? photoPicker,
+  }) {
+    return CatchFormScreen(
+      draft: CatchDraft.fromRecord(record),
+      catchService: catchService,
+      fishService: fishService,
+      editingRecord: record,
+      photoPicker: photoPicker,
+    );
+  }
 
   @override
   State<CatchFormScreen> createState() => _CatchFormScreenState();
@@ -29,8 +63,38 @@ class CatchFormScreen extends StatefulWidget {
 
 class _CatchFormScreenState extends State<CatchFormScreen> {
   final ImagePicker _picker = ImagePicker();
-  Fish? _species;
-  final List<XFile> _photos = [];
+  final PageController _pageController = PageController();
+  final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _lengthController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  late final CatchService _service;
+
+  int _step = 0;
+  bool _busy = false;
+  CatchRecord? _savedRecord;
+  List<XFile> _pendingPhotos = const [];
+  String? _error;
+
+  bool get _isEditing => widget.editingRecord != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = widget.catchService ?? CatchService();
+    _weightController.text = widget.draft.weightGrams?.toString() ?? '';
+    _lengthController.text = widget.draft.lengthMm?.toString() ?? '';
+    _descriptionController.text = widget.draft.description ?? '';
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _weightController.dispose();
+    _lengthController.dispose();
+    _descriptionController.dispose();
+    if (widget.catchService == null) _service.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickSpecies() async {
     final fish = await showModalBottomSheet<Fish>(
@@ -44,148 +108,579 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
     );
 
     if (!mounted || fish == null) return;
-    setState(() => _species = fish);
+    widget.draft.setSpecies(fish);
   }
 
-  Future<void> _addPhotos() async {
-    final picked = await _picker.pickMultiImage(imageQuality: 85);
-    if (!mounted || picked.isEmpty) return;
-    setState(() => _photos.addAll(picked));
+  Future<void> _pickPhotos() async {
+    final photos = widget.photoPicker != null
+        ? await widget.photoPicker!()
+        : await _picker.pickMultiImage(imageQuality: 85);
+
+    if (!mounted || photos.isEmpty) return;
+    final allowed = 8 - widget.draft.photos.length;
+    if (allowed <= 0) return;
+    widget.draft.addPhotos(photos.take(allowed));
+  }
+
+  Future<void> _save() async {
+    if (widget.draft.species == null) {
+      setState(() => _error = 'Escolha uma espécie para salvar.');
+      return;
+    }
+
+    final request = widget.draft.toRequest();
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final record = _isEditing
+          ? await _service.update(widget.editingRecord!.id, request)
+          : await _service.create(request);
+      _savedRecord = record;
+      _pendingPhotos = List<XFile>.from(widget.draft.photos);
+
+      if (_pendingPhotos.isNotEmpty) {
+        await _retryUpload();
+        return;
+      }
+
+      await _finish(record);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _retryUpload() async {
+    final record = _savedRecord;
+    if (record == null || _pendingPhotos.isEmpty) return;
+
+    try {
+      await _service.uploadPhotos(record.id, _pendingPhotos);
+      await _finish(record);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Registro salvo, mas falha ao subir fotos: $e';
+      });
+    }
+  }
+
+  Future<void> _finish(CatchRecord record) async {
+    CatchRecord output = record;
+    try {
+      output = await _service.fetchById(record.id);
+    } catch (_) {
+      // Fallback: o create/update já tem dados mínimos suficientes.
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _pendingPhotos = const [];
+      _error = null;
+    });
+    Navigator.of(context).pop(output);
+  }
+
+  void _next() {
+    if (_step == 0 && !widget.draft.canContinueFromStep1) return;
+    if (_step < 2) {
+      setState(() => _step += 1);
+      _pageController.animateToPage(
+        _step,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _back() {
+    if (_step == 0) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() => _step -= 1);
+    _pageController.animateToPage(
+      _step,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Registrar pesca')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.waterBody.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${widget.waterBody.waterType.label} • ${widget.waterBody.source ?? 'OSM'}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Ponto marcado',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(_formatPoint(widget.point)),
-                ],
-              ),
-            ),
+    return AnimatedBuilder(
+      animation: widget.draft,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_isEditing ? 'Editar pesca' : 'Registrar pesca'),
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Espécie',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+          body: Column(
+            children: [
+              _StepHeader(step: _step),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: _InfoBanner(
+                    message: _error!,
+                    actionLabel:
+                        _savedRecord != null && _pendingPhotos.isNotEmpty
+                        ? 'Reenviar fotos'
+                        : null,
+                    onAction: _savedRecord != null && _pendingPhotos.isNotEmpty
+                        ? _retryUpload
+                        : null,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _species?.name ?? 'Nenhuma espécie selecionada',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _pickSpecies,
-                    icon: const Icon(Icons.search),
-                    label: const Text('Escolher espécie'),
-                  ),
-                ],
+                ),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildCaptureStep(context),
+                    _buildDetailsStep(context),
+                    _buildReviewStep(context),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Fotos',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      Text('${_photos.length}/8'),
-                    ],
+          bottomNavigationBar: SafeArea(
+            minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : _back,
+                    child: Text(_step == 0 ? 'Cancelar' : 'Voltar'),
                   ),
-                  const SizedBox(height: 8),
-                  if (_photos.isEmpty)
-                    const Text('Nenhuma foto adicionada ainda.')
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _photos
-                          .map(
-                            (photo) => Chip(
-                              avatar: const Icon(Icons.photo, size: 18),
-                              label: Text(photo.name),
-                            ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _busy
+                        ? null
+                        : _step == 2
+                        ? _save
+                        : _next,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                          .toList(),
-                    ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _addPhotos,
-                    icon: const Icon(Icons.add_a_photo),
-                    label: const Text('Adicionar fotos'),
+                        : Text(_step == 2 ? 'Salvar registro' : 'Continuar'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        );
+      },
+    );
+  }
+
+  Widget _buildCaptureStep(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        _SummaryCard(
+          title: widget.draft.waterBody.name,
+          subtitle:
+              '${widget.draft.waterBody.waterType.label} • ${widget.draft.waterBody.source ?? 'OSM'}',
+          lines: [
+            'Ponto: ${_formatPoint()}',
+            'Data: ${_formatDateTime(widget.draft.caughtAt)}',
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Fotos',
+          subtitle: 'Obrigatórias no app, até 8 arquivos.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  const Text(
-                    'Próxima etapa',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'O wizard completo entra aqui com detalhes, método e revisão.',
-                    style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.7),
+                  for (var i = 0; i < widget.draft.photos.length; i++)
+                    InputChip(
+                      avatar: const Icon(Icons.photo, size: 18),
+                      label: Text(widget.draft.photos[i].name),
+                      onDeleted: () => widget.draft.removePhotoAt(i),
                     ),
-                  ),
                 ],
               ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _busy ? null : _pickPhotos,
+                icon: const Icon(Icons.add_a_photo),
+                label: const Text('Adicionar fotos'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Espécie',
+          subtitle: 'Seleção vinda do catálogo `/api/fish`.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.draft.species?.name ?? 'Nenhuma espécie selecionada',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _busy ? null : _pickSpecies,
+                icon: const Icon(Icons.search),
+                label: const Text('Escolher espécie'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailsStep(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        _SectionCard(
+          title: 'Detalhes',
+          subtitle: 'Peso, comprimento, método e finalidade.',
+          child: Column(
+            children: [
+              TextField(
+                controller: _weightController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Peso (g)',
+                  prefixIcon: Icon(Icons.scale),
+                ),
+                onChanged: widget.draft.setWeight,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _lengthController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Comprimento (mm)',
+                  prefixIcon: Icon(Icons.straighten),
+                ),
+                onChanged: widget.draft.setLength,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<FishingMethod>(
+                initialValue: widget.draft.fishingMethod,
+                decoration: const InputDecoration(labelText: 'Método'),
+                items: FishingMethod.values
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) widget.draft.setFishingMethod(value);
+                },
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<FishingPurpose>(
+                segments: FishingPurpose.values
+                    .map(
+                      (value) =>
+                          ButtonSegment(value: value, label: Text(value.label)),
+                    )
+                    .toList(),
+                selected: {widget.draft.purpose},
+                onSelectionChanged: (value) {
+                  widget.draft.setPurpose(value.first);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Descrição',
+                  alignLabelWithHint: true,
+                ),
+                onChanged: widget.draft.setDescription,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewStep(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        _SectionCard(
+          title: 'Local e privacidade',
+          subtitle: 'O backend aplica a privacidade do ponto.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.draft.waterBody.name),
+              Text(_formatPoint()),
+              const SizedBox(height: 12),
+              SegmentedButton<LocationVisibility>(
+                segments: LocationVisibility.values
+                    .map(
+                      (value) =>
+                          ButtonSegment(value: value, label: Text(value.label)),
+                    )
+                    .toList(),
+                selected: {widget.draft.locationVisibility},
+                onSelectionChanged: (value) {
+                  widget.draft.setLocationVisibility(value.first);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Resumo',
+          subtitle: 'Confira antes de salvar.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SummaryLine('Espécie', widget.draft.species?.name ?? '---'),
+              _SummaryLine('Fotos', '${widget.draft.photos.length}'),
+              _SummaryLine('Método', widget.draft.fishingMethod.label),
+              _SummaryLine('Finalidade', widget.draft.purpose.label),
+              _SummaryLine(
+                'Visibilidade',
+                widget.draft.locationVisibility.label,
+              ),
+              _SummaryLine(
+                'Peso',
+                widget.draft.weightGrams?.toString() ?? '---',
+              ),
+              _SummaryLine(
+                'Comprimento',
+                widget.draft.lengthMm?.toString() ?? '---',
+              ),
+              if (widget.draft.description != null &&
+                  widget.draft.description!.trim().isNotEmpty)
+                _SummaryLine('Descrição', widget.draft.description!.trim()),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Clima',
+          subtitle: 'Preenchido automaticamente no backend.',
+          child: Text(
+            'Best-effort: se a API falhar, o registro ainda salva.',
+            style: TextStyle(color: Colors.black.withValues(alpha: 0.7)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatPoint() {
+    final lat = widget.draft.point.latitude.toStringAsFixed(5);
+    final lon = widget.draft.point.longitude.toStringAsFixed(5);
+    return '$lat, $lon';
+  }
+
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} '
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _StepHeader extends StatelessWidget {
+  final int step;
+
+  const _StepHeader({required this.step});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Captura', 'Detalhes', 'Revisão'];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Row(
+        children: List.generate(labels.length, (index) {
+          final selected = index == step;
+          final done = index < step;
+          return Expanded(
+            child: Container(
+              margin: EdgeInsets.only(
+                right: index == labels.length - 1 ? 0 : 8,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12)
+                    : done
+                    ? Colors.green.withValues(alpha: 0.10)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.black12,
+                ),
+              ),
+              child: Text(
+                labels[index],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<String> lines;
+
+  const _SummaryCard({
+    required this.title,
+    required this.subtitle,
+    required this.lines,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 12),
+            ...lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(line),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SummaryLine(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
   }
+}
 
-  String _formatPoint(LatLng value) {
-    final lat = value.latitude.toStringAsFixed(5);
-    final lon = value.longitude.toStringAsFixed(5);
-    return '$lat, $lon';
+class _InfoBanner extends StatelessWidget {
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _InfoBanner({required this.message, this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 8),
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
+    );
   }
 }

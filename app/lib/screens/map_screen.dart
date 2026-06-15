@@ -8,14 +8,20 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/app_log.dart';
 import '../main.dart';
+import '../models/catch_draft.dart';
+import '../models/catch_record.dart';
 import '../models/water_body.dart';
+import '../services/catch_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
+import 'catch_detail_screen.dart';
 import 'catch_form_screen.dart';
 
 class MapScreen extends StatefulWidget {
   final WaterBodyService? waterBodyService;
   final FishService? fishService;
+  final CatchService? catchService;
+  final String? authToken;
 
   /// Test hook: pre-seeds draft point when mark mode opens.
   final LatLng? debugInitialDraftPoint;
@@ -24,6 +30,8 @@ class MapScreen extends StatefulWidget {
     super.key,
     this.waterBodyService,
     this.fishService,
+    this.catchService,
+    this.authToken,
     this.debugInitialDraftPoint,
   });
 
@@ -44,10 +52,13 @@ class _MapScreenState extends State<MapScreen> {
       CancellableNetworkTileProvider();
   Timer? _viewportDebounce;
   Timer? _nearestDebounce;
+  Timer? _catchDebounce;
   late final WaterBodyService _service;
+  late final CatchService _catchService;
 
   int _viewportRequestSeq = 0;
   int _nearestRequestSeq = 0;
+  int _catchRequestSeq = 0;
   int _selectedIndex = 0;
   bool _loading = true;
   bool _refreshing = false;
@@ -60,20 +71,22 @@ class _MapScreenState extends State<MapScreen> {
   WaterBody? _nearestBody;
   _NearestStatus _nearestStatus = _NearestStatus.idle;
   List<WaterBody> _waterBodies = const [];
+  List<CatchRecord> _catches = const [];
 
   @override
   void initState() {
     super.initState();
     _service = widget.waterBodyService ?? WaterBodyService();
+    _catchService = widget.catchService ?? CatchService();
   }
 
   @override
   void dispose() {
     _viewportDebounce?.cancel();
     _nearestDebounce?.cancel();
-    if (widget.waterBodyService == null) {
-      _service.dispose();
-    }
+    _catchDebounce?.cancel();
+    if (widget.waterBodyService == null) _service.dispose();
+    if (widget.catchService == null) _catchService.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -101,6 +114,7 @@ class _MapScreenState extends State<MapScreen> {
         _refreshing = false;
         _error = null;
         _waterBodies = const [];
+        _catches = const [];
         _selectedIndex = 0;
         _loadedViewport = null;
       });
@@ -121,11 +135,11 @@ class _MapScreenState extends State<MapScreen> {
     final zoom = camera.zoom.round();
 
     _viewportDebounce = Timer(const Duration(milliseconds: 350), () {
-      unawaited(_loadWaterBodies(target: target, zoom: zoom, seq: seq));
+      unawaited(_loadViewportData(target: target, zoom: zoom, seq: seq));
     });
   }
 
-  Future<void> _loadWaterBodies({
+  Future<void> _loadViewportData({
     required _Bbox target,
     required int zoom,
     required int seq,
@@ -163,6 +177,35 @@ class _MapScreenState extends State<MapScreen> {
         _loading = false;
         _refreshing = false;
       });
+      return;
+    }
+
+    if (widget.catchService != null) {
+      unawaited(_loadCatches(target: target, seq: seq));
+    }
+  }
+
+  Future<void> _loadCatches({required _Bbox target, required int seq}) async {
+    final currentSeq = ++_catchRequestSeq;
+    try {
+      final catches = await _catchService.list(
+        bbox: target.toQueryString(),
+        page: 0,
+        size: 200,
+      );
+      if (!mounted ||
+          seq != _viewportRequestSeq ||
+          currentSeq != _catchRequestSeq) {
+        return;
+      }
+      setState(() => _catches = catches);
+    } on ApiException {
+      if (!mounted ||
+          seq != _viewportRequestSeq ||
+          currentSeq != _catchRequestSeq) {
+        return;
+      }
+      setState(() => _catches = const []);
     }
   }
 
@@ -367,15 +410,97 @@ class _MapScreenState extends State<MapScreen> {
     final waterBody = _nearestBody;
     if (point == null || waterBody == null) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CatchFormScreen(
-          point: point,
-          waterBody: waterBody,
-          fishService: widget.fishService,
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => CatchFormScreen.create(
+              draft: CatchDraft(point: point, waterBody: waterBody),
+              fishService: widget.fishService,
+              catchService: _catchService,
+            ),
+          ),
+        )
+        .then((_) => _scheduleViewportLoad(_mapController.camera, force: true));
+  }
+
+  void _openCatchDetail(CatchRecord record) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.set_meal, color: AppColors.primary, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    record.species.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${record.waterBody.name} • ${_formatCatchDate(record.caughtAt)}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              record.location == null ||
+                      (!record.mine &&
+                          record.locationVisibility ==
+                              LocationVisibility.riverOnly)
+                  ? 'Local aproximado'
+                  : 'Ponto exato',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _navigateToCatchDetail(record);
+                },
+                child: const Text('Ver detalhes'),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _formatCatchDate(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}';
+  }
+
+  void _navigateToCatchDetail(CatchRecord record) {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => CatchDetailScreen(
+              initialRecord: record,
+              catchService: _catchService,
+              fishService: widget.fishService,
+              authToken: widget.authToken,
+            ),
+          ),
+        )
+        .then((value) {
+          if (value == true) {
+            _scheduleViewportLoad(_mapController.camera, force: true);
+          }
+        });
   }
 
   @override
@@ -412,6 +537,7 @@ class _MapScreenState extends State<MapScreen> {
               if (_polygons.isNotEmpty)
                 PolygonLayer<Object>(polygons: _polygons),
               MarkerLayer(markers: _markers),
+              if (!_markingMode) MarkerLayer(markers: _catchMarkers),
             ],
           ),
           if (_loading)
@@ -843,6 +969,33 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return markers;
+  }
+
+  List<Marker> get _catchMarkers {
+    if (_markingMode) return const [];
+    return _catches.map((record) {
+      final point =
+          record.location ??
+          record.waterBody.centerLocation ??
+          _fallbackCenter(record.waterBody);
+      final approximate =
+          record.location == null ||
+          (!record.mine &&
+              record.locationVisibility == LocationVisibility.riverOnly);
+      return Marker(
+        point: point,
+        width: 42,
+        height: 42,
+        child: GestureDetector(
+          onTap: () => _openCatchDetail(record),
+          child: Icon(
+            approximate ? Icons.place_outlined : Icons.set_meal,
+            color: approximate ? Colors.orange : AppColors.deep,
+            size: approximate ? 34 : 30,
+          ),
+        ),
+      );
+    }).toList();
   }
 
   List<Polyline<Object>> _linesForBody(WaterBody body) {

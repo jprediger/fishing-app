@@ -14,7 +14,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class CatchPhotoStorageService {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+    private static final Set<String> ALLOWED_CONTENT_TYPES =
+            Set.of("image/jpeg", "image/jpg", "image/png", "image/webp");
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp");
 
     private final Path uploadsDir;
 
@@ -54,10 +56,30 @@ public class CatchPhotoStorageService {
         if (file.getSize() > 8L * 1024L * 1024L) {
             throw new IllegalArgumentException("Photo must be at most 8 MB");
         }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("Unsupported photo type");
+        String contentType = normalizeContentType(file.getContentType());
+        if (ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            return;
         }
+        if (isMissingContentType(contentType) && hasAllowedExtension(file.getOriginalFilename())) {
+            return;
+        }
+        throw new IllegalArgumentException("Unsupported photo type");
+    }
+
+    private boolean isMissingContentType(String contentType) {
+        return contentType == null || contentType.isBlank() || "application/octet-stream".equals(contentType);
+    }
+
+    private boolean hasAllowedExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return false;
+        }
+        String lower = originalFilename.toLowerCase(Locale.ROOT);
+        return ALLOWED_EXTENSIONS.stream().anyMatch(lower::endsWith);
+    }
+
+    private String normalizeContentType(String contentType) {
+        return contentType == null ? null : contentType.toLowerCase(Locale.ROOT).trim();
     }
 
     private String extensionFor(MultipartFile file) {
@@ -68,8 +90,8 @@ public class CatchPhotoStorageService {
             if (lower.endsWith(".png")) return ".png";
             if (lower.endsWith(".webp")) return ".webp";
         }
-        return switch (file.getContentType()) {
-            case "image/jpeg" -> ".jpg";
+        return switch (normalizeContentType(file.getContentType())) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
             default -> ".bin";

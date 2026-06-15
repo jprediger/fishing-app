@@ -33,8 +33,9 @@ public class CatchController {
     public Page<CatchResponseDTO> findAll(
             Authentication authentication,
             @PageableDefault(size = 20, sort = "id") Pageable pageable,
-            @RequestParam(required = false) Long speciesId) {
-        return catchService.findAll(pageable, authentication.getName(), speciesId);
+            @RequestParam(required = false) Long speciesId,
+            @RequestParam(required = false) String bbox) {
+        return catchService.findAll(pageable, authentication.getName(), speciesId, bbox);
     }
 
     @GetMapping("/mine")

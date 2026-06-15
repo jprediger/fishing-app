@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/catch_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
@@ -13,6 +14,9 @@ class HomeShell extends StatefulWidget {
   /// Serviço opcional repassado à tela de busca (usado nos testes).
   final FishService? fishService;
 
+  /// Serviço opcional repassado às telas de catches.
+  final CatchService? catchService;
+
   /// Serviço opcional repassado ao mapa.
   final WaterBodyService? waterBodyService;
 
@@ -22,6 +26,7 @@ class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
     this.fishService,
+    this.catchService,
     this.waterBodyService,
     this.auth,
   });
@@ -42,6 +47,8 @@ class _HomeShellState extends State<HomeShell> {
       MapScreen(
         waterBodyService: widget.waterBodyService,
         fishService: widget.fishService,
+        catchService: widget.catchService,
+        authToken: widget.auth?.token,
       ),
       SearchScreen(service: widget.fishService),
       ProfileScreen(auth: widget.auth),

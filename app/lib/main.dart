@@ -7,9 +7,16 @@ import 'config/app_log.dart';
 import 'screens/auth_gate.dart';
 import 'screens/home_shell.dart';
 import 'services/auth_http_client.dart';
+import 'services/catch_service.dart';
 import 'services/fish_service.dart';
 import 'services/water_body_service.dart';
 import 'state/auth_controller.dart';
+import 'theme/app_theme.dart';
+
+// Re-exporta os tokens de marca para que `import '../main.dart'` continue
+// dando acesso a `AppColors` durante a migração das telas para o `colorScheme`.
+// Ver docs/plans/todo: migração de hardcodes de cor.
+export 'theme/app_colors.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +38,7 @@ void main() {
     onUnauthorized: auth.onUnauthorized,
   );
   final fishService = FishService(client: httpClient);
+  final catchService = CatchService(client: httpClient);
   final waterBodyService = WaterBodyService(client: httpClient);
 
   // Lê a sessão salva e define o estado inicial (splash -> login/app).
@@ -40,30 +48,18 @@ void main() {
     FishingApp(
       auth: auth,
       fishService: fishService,
+      catchService: catchService,
       waterBodyService: waterBodyService,
     ),
-  );
-}
-
-/// Cores base do app, inspiradas em água e natureza.
-class AppColors {
-  static const Color primary = Color(0xFF0B6E99); // azul água
-  static const Color secondary = Color(0xFF14A38B); // verde-água
-  static const Color deep = Color(0xFF073B4C); // azul profundo
-  static const Color surface = Color(0xFFF3F6F8); // fundo claro
-  static const Color sand = Color(0xFFF2C14E); // detalhe areia/sol
-
-  /// Gradiente usado em cabeçalhos e destaques.
-  static const LinearGradient waterGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [primary, secondary],
   );
 }
 
 class FishingApp extends StatelessWidget {
   /// Serviço de catálogo, injetado nos testes e no `main`.
   final FishService? fishService;
+
+  /// Serviço de catches, injetado nos testes e no `main`.
+  final CatchService? catchService;
 
   /// Serviço do mapa, injetado nos testes e no `main`.
   final WaterBodyService? waterBodyService;
@@ -74,67 +70,29 @@ class FishingApp extends StatelessWidget {
   const FishingApp({
     super.key,
     this.fishService,
+    this.catchService,
     this.waterBodyService,
     this.auth,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      primary: AppColors.primary,
-      secondary: AppColors.secondary,
-    );
-
     return MaterialApp(
       title: 'Pescaria',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: colorScheme,
-        scaffoldBackgroundColor: AppColors.surface,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          clipBehavior: Clip.antiAlias,
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: Colors.white,
-          indicatorColor: AppColors.secondary.withValues(alpha: 0.18),
-          elevation: 3,
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppColors.deep : Colors.black54,
-            );
-          }),
-        ),
-        chipTheme: const ChipThemeData(showCheckmark: false),
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: auth != null
           ? AuthGate(
               auth: auth!,
               fishService: fishService ?? FishService(),
+              catchService: catchService ?? CatchService(),
               waterBodyService: waterBodyService ?? WaterBodyService(),
             )
           : HomeShell(
               fishService: fishService,
+              catchService: catchService,
               waterBodyService: waterBodyService,
             ),
     );

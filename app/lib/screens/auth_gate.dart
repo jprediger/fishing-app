@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../services/catch_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
@@ -12,12 +13,14 @@ import 'login_screen.dart';
 class AuthGate extends StatelessWidget {
   final AuthController auth;
   final FishService fishService;
+  final CatchService catchService;
   final WaterBodyService waterBodyService;
 
   const AuthGate({
     super.key,
     required this.auth,
     required this.fishService,
+    required this.catchService,
     required this.waterBodyService,
   });
 
@@ -35,6 +38,7 @@ class AuthGate extends StatelessWidget {
             return HomeShell(
               auth: auth,
               fishService: fishService,
+              catchService: catchService,
               waterBodyService: waterBodyService,
             );
         }

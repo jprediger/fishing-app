@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.univates.fishing_backend.dto.CatchRequestDTO;
@@ -16,6 +17,7 @@ import com.univates.fishing_backend.repository.FishRepository;
 import com.univates.fishing_backend.repository.UserRepository;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -112,6 +114,35 @@ class CatchServiceTest {
 
         assertThatThrownBy(() -> catchService.findById(99L, "demo@fishing.local"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void findAll_withBbox_filtersViewportAndSpecies() {
+        when(catchRepository.findAllInBbox(
+                        anyDouble(),
+                        anyDouble(),
+                        anyDouble(),
+                        anyDouble(),
+                        eq(1L),
+                        any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(sampleRecord(LocationVisibility.EXACT, "owner@fishing.local"))));
+
+        var result = catchService.findAll(
+                org.springframework.data.domain.PageRequest.of(0, 20),
+                "demo@fishing.local",
+                1L,
+                "-52.0,-31.0,-50.0,-29.0");
+
+        assertThat(result).hasSize(1);
+        verify(catchRepository)
+                .findAllInBbox(
+                        anyDouble(),
+                        anyDouble(),
+                        anyDouble(),
+                        anyDouble(),
+                        eq(1L),
+                        any(org.springframework.data.domain.Pageable.class));
     }
 
     private CatchRequestDTO sampleRequest() {
