@@ -16,6 +16,7 @@ import 'package:http/testing.dart';
 import 'package:mobile_app/main.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/catch_service.dart';
+import 'package:mobile_app/services/establishment_service.dart';
 import 'package:mobile_app/services/fish_service.dart';
 import 'package:mobile_app/services/profile_service.dart';
 import 'package:mobile_app/services/token_storage.dart';
@@ -72,6 +73,19 @@ const _catchPageJson = '''
   "totalElements": 0,
   "totalPages": 0
 }
+''';
+
+const _establishmentsJson = '''
+[
+  {
+    "id": 1,
+    "name": "Loja do Pescador",
+    "category": "LOJA_PESCA",
+    "address": "Centro",
+    "lon": -51.20,
+    "lat": -30.05
+  }
+]
 ''';
 
 const _loginBody = {
@@ -153,6 +167,14 @@ void main() {
 
       return http.Response('', 404);
     });
+    final establishmentClient = MockClient((request) async {
+      expect(request.url.path, '/api/establishments');
+      return http.Response(
+        _establishmentsJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
 
     await tester.pumpWidget(
       FishingApp(
@@ -161,6 +183,7 @@ void main() {
         catchService: CatchService(client: appClient),
         profileService: ProfileService(client: appClient),
         waterBodyService: WaterBodyService(client: appClient),
+        establishmentService: EstablishmentService(client: establishmentClient),
       ),
     );
     await tester.pumpAndSettle();
@@ -174,6 +197,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tucunaré'), findsOneWidget);
     expect(find.text('Dourado'), findsOneWidget);
+
+    // Aba Locais carrega os estabelecimentos do backend simulado.
+    await tester.tap(find.text('Locais'));
+    await tester.pumpAndSettle();
+    expect(find.text('Loja do Pescador'), findsOneWidget);
 
     // Aba Eu mostra o usuário real da sessão.
     await tester.tap(find.text('Eu'));
@@ -228,6 +256,13 @@ void main() {
 
       return http.Response('', 404);
     });
+    final establishmentClient = MockClient(
+      (_) async => http.Response(
+        _establishmentsJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
 
     await tester.pumpWidget(
       FishingApp(
@@ -236,6 +271,7 @@ void main() {
         catchService: CatchService(client: appClient),
         profileService: ProfileService(client: appClient),
         waterBodyService: WaterBodyService(client: appClient),
+        establishmentService: EstablishmentService(client: establishmentClient),
       ),
     );
     await tester.pumpAndSettle();

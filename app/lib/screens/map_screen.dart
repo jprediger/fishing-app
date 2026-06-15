@@ -10,8 +10,10 @@ import '../config/app_log.dart';
 import '../main.dart';
 import '../models/catch_draft.dart';
 import '../models/catch_record.dart';
+import '../models/establishment.dart';
 import '../models/water_body.dart';
 import '../services/catch_service.dart';
+import '../services/establishment_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../widgets/map_marker.dart';
@@ -23,9 +25,14 @@ class MapScreen extends StatefulWidget {
   final WaterBodyService? waterBodyService;
   final FishService? fishService;
   final CatchService? catchService;
+  final EstablishmentService? establishmentService;
   final String? authToken;
   final bool showTiles;
   final double? debugInitialZoom;
+
+  /// Estabelecimento a focar no mapa (vindo da aba "Locais"). Quando muda para
+  /// um valor não nulo, o mapa centraliza nele e exibe um marcador.
+  final Establishment? focusEstablishment;
 
   /// Test hook: pre-seeds draft point when mark mode opens.
   final LatLng? debugInitialDraftPoint;
@@ -35,9 +42,11 @@ class MapScreen extends StatefulWidget {
     this.waterBodyService,
     this.fishService,
     this.catchService,
+    this.establishmentService,
     this.authToken,
     this.showTiles = true,
     this.debugInitialZoom,
+    this.focusEstablishment,
     this.debugInitialDraftPoint,
   });
 
@@ -101,11 +110,39 @@ class _MapScreenState extends State<MapScreen> {
   List<WaterBody> _waterBodies = const [];
   List<CatchRecord> _catches = const [];
 
+  /// Zoom usado ao centralizar num estabelecimento vindo da aba "Locais".
+  static const double _establishmentFocusZoom = 14.0;
+
+  late final EstablishmentService _establishmentService;
+  bool _mapReady = false;
+
+  /// Camadas exibíveis no mapa, controladas pelo painel de camadas.
+  bool _showWaterBodies = true;
+  bool _showCatches = true;
+  bool _showEstablishments = false;
+  bool _layersPanelOpen = false;
+
+  List<Establishment> _establishments = const [];
+
+  /// Estabelecimento selecionado (por toque no marcador ou vindo de "Locais").
+  Establishment? _selectedEstablishment;
+
   @override
   void initState() {
     super.initState();
     _service = widget.waterBodyService ?? WaterBodyService();
     _catchService = widget.catchService ?? CatchService();
+    _establishmentService =
+        widget.establishmentService ?? EstablishmentService();
+  }
+
+  @override
+  void didUpdateWidget(MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final focus = widget.focusEstablishment;
+    if (focus != null && !identical(focus, oldWidget.focusEstablishment)) {
+      _applyEstablishmentFocus(focus);
+    }
   }
 
   @override
@@ -115,14 +152,69 @@ class _MapScreenState extends State<MapScreen> {
     _catchDebounce?.cancel();
     if (widget.waterBodyService == null) _service.dispose();
     if (widget.catchService == null) _catchService.dispose();
+    if (widget.establishmentService == null) _establishmentService.dispose();
     _mapController.dispose();
     super.dispose();
   }
 
   void _onMapReady() {
     if (!mounted) return;
+    _mapReady = true;
     _syncCamera(_mapController.camera);
     _scheduleViewportLoad(_mapController.camera, force: true);
+    final focus = widget.focusEstablishment;
+    if (focus != null) _applyEstablishmentFocus(focus);
+  }
+
+  /// Centraliza num estabelecimento (vindo de "Locais"), liga a camada e o
+  /// seleciona. Garante que a lista esteja carregada para exibir os demais.
+  void _applyEstablishmentFocus(Establishment establishment) {
+    if (!mounted) return;
+    setState(() {
+      _showEstablishments = true;
+      _selectedEstablishment = establishment;
+    });
+    unawaited(_loadEstablishments());
+    final location = establishment.location;
+    if (location != null && _mapReady) {
+      _mapController.move(location, _establishmentFocusZoom);
+    }
+  }
+
+  void _setShowWaterBodies(bool value) {
+    setState(() {
+      _showWaterBodies = value;
+      if (!value) _selectedBody = null;
+    });
+  }
+
+  void _setShowCatches(bool value) {
+    setState(() => _showCatches = value);
+  }
+
+  void _setShowEstablishments(bool value) {
+    setState(() {
+      _showEstablishments = value;
+      if (!value) _selectedEstablishment = null;
+    });
+    if (value) unawaited(_loadEstablishments());
+  }
+
+  /// Carrega os estabelecimentos uma vez (o conjunto é pequeno). Mantém em
+  /// cache; falhas são silenciosas para não atrapalhar o mapa.
+  Future<void> _loadEstablishments() async {
+    if (_establishments.isNotEmpty) return;
+    try {
+      final list = await _establishmentService.search(limit: 500);
+      if (!mounted) return;
+      setState(() => _establishments = list);
+    } on ApiException {
+      // Sem estabelecimentos: a camada simplesmente fica vazia.
+    }
+  }
+
+  void _selectEstablishment(Establishment establishment) {
+    setState(() => _selectedEstablishment = establishment);
   }
 
   /// Sincroniza zoom e viewport visível com a câmera. Dispara rebuild (e novo
@@ -272,7 +364,10 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    setState(() => _markingMode = true);
+    setState(() {
+      _markingMode = true;
+      _layersPanelOpen = false;
+    });
     _resetDraftSelection();
     if (widget.debugInitialDraftPoint != null) {
       _setDraftPoint(widget.debugInitialDraftPoint!);
@@ -587,11 +682,14 @@ class _MapScreenState extends State<MapScreen> {
                   errorTileCallback: (tile, error, _) =>
                       AppLog.tileError(error),
                 ),
-              if (lineStrings.isNotEmpty)
+              if (_showWaterBodies && lineStrings.isNotEmpty)
                 PolylineLayer<Object>(polylines: lineStrings),
-              if (polygons.isNotEmpty) PolygonLayer<Object>(polygons: polygons),
+              if (_showWaterBodies && polygons.isNotEmpty)
+                PolygonLayer<Object>(polygons: polygons),
               MarkerLayer(markers: markers),
-              if (!_markingMode) MarkerLayer(markers: _catchMarkers),
+              if (!_markingMode && _showCatches)
+                MarkerLayer(markers: _catchMarkers),
+              if (!_markingMode) MarkerLayer(markers: _establishmentMarkers),
             ],
           ),
           if (_loading)
@@ -611,22 +709,46 @@ class _MapScreenState extends State<MapScreen> {
             ),
           if (_error != null) _buildErrorBanner(),
           if (!_markingMode &&
+              _showWaterBodies &&
               _waterBodies.isEmpty &&
               _error == null &&
               _cameraZoom >= _minViewportZoom)
             _buildEmptyState(),
+          if (_layersPanelOpen && !_markingMode) _buildLayersPanel(),
           if (_cameraZoom < _minViewportZoom) _buildZoomHint(),
           if (_markingMode) _buildNearestCard(),
           if (!_markingMode && _selectedBody != null) _buildSelectedBodyCard(),
+          if (!_markingMode &&
+              _selectedBody == null &&
+              _selectedEstablishment != null)
+            _buildSelectedEstablishmentCard(),
         ],
       ),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(
-          bottom: (_markingMode || _selectedBody != null) ? 190 : 32,
+          bottom:
+              (_markingMode ||
+                  _selectedBody != null ||
+                  _selectedEstablishment != null)
+              ? 190
+              : 32,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (!_markingMode)
+              FloatingActionButton.small(
+                heroTag: 'map-layers',
+                backgroundColor: _layersPanelOpen ? AppColors.deep : cs.surface,
+                foregroundColor: _layersPanelOpen
+                    ? cs.onPrimary
+                    : AppColors.primary,
+                tooltip: 'Camadas do mapa',
+                onPressed: () =>
+                    setState(() => _layersPanelOpen = !_layersPanelOpen),
+                child: const Icon(Icons.layers),
+              ),
+            if (!_markingMode) const SizedBox(height: 12),
             FloatingActionButton.small(
               heroTag: 'map-mark-mode',
               backgroundColor: _markingMode ? AppColors.deep : cs.surface,
@@ -743,6 +865,165 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSelectedEstablishmentCard() {
+    final cs = Theme.of(context).colorScheme;
+    final establishment = _selectedEstablishment!;
+    final address = establishment.address;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: _SelectionCard(
+          background: cs.surface,
+          borderColor: AppColors.markerEstablishment.withValues(alpha: 0.35),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.markerEstablishment.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.store, color: AppColors.deep),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      establishment.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      address == null || address.isEmpty
+                          ? establishment.category.label
+                          : '${establishment.category.label} · $address',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => _selectedEstablishment = null),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLayersPanel() {
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 16, bottom: 200),
+          child: Container(
+            width: 240,
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Camadas',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () =>
+                            setState(() => _layersPanelOpen = false),
+                      ),
+                    ],
+                  ),
+                ),
+                _layerSwitch(
+                  color: AppColors.markerWaterBody,
+                  icon: Icons.water_drop,
+                  label: 'Corpos d\'água',
+                  value: _showWaterBodies,
+                  onChanged: _setShowWaterBodies,
+                ),
+                _layerSwitch(
+                  color: AppColors.markerCatch,
+                  icon: Icons.phishing,
+                  label: 'Pescas',
+                  value: _showCatches,
+                  onChanged: _setShowCatches,
+                ),
+                _layerSwitch(
+                  color: AppColors.markerEstablishment,
+                  icon: Icons.store,
+                  label: 'Estabelecimentos',
+                  value: _showEstablishments,
+                  onChanged: _setShowEstablishments,
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _layerSwitch({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return SwitchListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      secondary: CircleAvatar(
+        radius: 14,
+        backgroundColor: color,
+        child: Icon(icon, size: 15, color: Colors.white),
+      ),
+      title: Text(label, style: const TextStyle(fontSize: 14)),
+      value: value,
+      onChanged: onChanged,
     );
   }
 
@@ -980,7 +1261,8 @@ class _MapScreenState extends State<MapScreen> {
   List<Marker> _markersFor(List<WaterBody> bodies) {
     // Pins dos corpos d'água só aparecem com zoom suficiente; mais longe,
     // só a geometria fica visível para não poluir o mapa.
-    final showBodyPins = !_markingMode && _cameraZoom >= _markerMinZoom;
+    final showBodyPins =
+        !_markingMode && _showWaterBodies && _cameraZoom >= _markerMinZoom;
     final markers = <Marker>[
       if (showBodyPins)
         for (final body in bodies)
@@ -1045,6 +1327,38 @@ class _MapScreenState extends State<MapScreen> {
             ),
           );
         })
+        .toList();
+  }
+
+  List<Marker> get _establishmentMarkers {
+    if (_markingMode) return const [];
+    if (!_showEstablishments && _selectedEstablishment == null) {
+      return const [];
+    }
+
+    final items = <Establishment>[];
+    if (_showEstablishments) items.addAll(_establishments);
+    final selected = _selectedEstablishment;
+    if (selected != null && !items.any((e) => e.id == selected.id)) {
+      items.add(selected);
+    }
+
+    return items
+        .where((establishment) => establishment.location != null)
+        .map(
+          (establishment) => Marker(
+            point: establishment.location!,
+            width: MapMarker.footprint,
+            height: MapMarker.footprint,
+            child: GestureDetector(
+              onTap: () => _selectEstablishment(establishment),
+              child: MapMarker(
+                kind: MapMarkerKind.establishment,
+                selected: _selectedEstablishment?.id == establishment.id,
+              ),
+            ),
+          ),
+        )
         .toList();
   }
 
