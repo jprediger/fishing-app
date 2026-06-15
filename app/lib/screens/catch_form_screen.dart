@@ -453,6 +453,18 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
                   widget.draft.setLocationVisibility(value.first);
                 },
               ),
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Compartilhar com a comunidade'),
+                subtitle: Text(
+                  widget.draft.shared
+                      ? 'A pesca aparece nos feeds (mapa e posts).'
+                      : 'Pesca privada: só você vê.',
+                ),
+                value: widget.draft.shared,
+                onChanged: widget.draft.setShared,
+              ),
             ],
           ),
         ),
@@ -470,6 +482,10 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
               _SummaryLine(
                 'Visibilidade',
                 widget.draft.locationVisibility.label,
+              ),
+              _SummaryLine(
+                'Compartilhar',
+                widget.draft.shared ? 'Sim' : 'Não (privada)',
               ),
               _SummaryLine(
                 'Peso',

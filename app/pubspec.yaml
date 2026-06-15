@@ -60,6 +60,27 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # Gera os ícones de app de todas as plataformas a partir de um PNG.
+  # Fonte do ícone: assets/icon/icone_pescaja.svg (rasterizado em app_icon.png).
+  flutter_launcher_icons: ^0.14.1
+
+# Ícone do app (rode: dart run flutter_launcher_icons).
+flutter_launcher_icons:
+  image_path: "assets/icon/app_icon.png"
+  android: true
+  min_sdk_android: 21
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#0D2B45"
+    theme_color: "#0D2B45"
+  windows:
+    generate: true
+    icon_size: 48
+  macos:
+    generate: true
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

@@ -2,7 +2,7 @@
     <!-- Necessário para carregar os tiles do mapa (OpenStreetMap). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="mobile_app"
+        android:label="PescaJá"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
