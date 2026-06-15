@@ -304,7 +304,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
         const SizedBox(height: 16),
         _SectionCard(
           title: 'Fotos',
-          subtitle: 'Obrigatórias no app, até 8 arquivos.',
+          subtitle: 'Até 8 arquivos.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -332,7 +332,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
         const SizedBox(height: 16),
         _SectionCard(
           title: 'Espécie',
-          subtitle: 'Seleção vinda do catálogo `/api/fish`.',
+          subtitle: 'Seleção vinda do catálogo`.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

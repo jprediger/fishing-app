@@ -1,10 +1,3 @@
-// Gerador do ícone do app (não é teste de regressão — nome sem `_test` para
-// ficar fora da suíte). Rasteriza o SVG `assets/icon/icone_pescaja.svg`
-// (reproduzido fielmente no Canvas) num PNG 1024×1024 em `assets/icon/app_icon.png`.
-//
-// Regenerar: flutter test test/generate_app_icon.dart
-// Depois aplicar nas plataformas: dart run flutter_launcher_icons
-
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -12,92 +5,132 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _bg = Color(0xFF0D2B45);
-const _teal = Color(0xFF2A9D8F);
-const _gold = Color(0xFFE9C46A);
-const _wave = Color(0x995DD4C8); // #5DD4C8 com ~60% de opacidade
+const _primary = Color(0xFF0B6E99);
+const _secondary = Color(0xFF14A38B);
+const _sand = Color(0xFFF2C14E);
+const _white = Colors.white;
 
-void _paintIcon(Canvas canvas) {
-  // SVG em espaço 512×512; escalamos 2x para 1024 (mantém larguras de traço).
-  canvas.scale(2.0);
+Future<Uint8List> _renderIcon({required bool transparentBackground}) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, 1024, 1024));
 
-  // Fundo arredondado.
-  canvas.drawRRect(
-    RRect.fromRectAndRadius(
-      const Rect.fromLTWH(0, 0, 512, 512),
-      const Radius.circular(112),
-    ),
-    Paint()..color = _bg,
-  );
+  if (!transparentBackground) {
+    const rect = Rect.fromLTWH(0, 0, 1024, 1024);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(232));
+    final background = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [_primary, _secondary],
+      ).createShader(rect);
+    canvas.drawRRect(rrect, background);
 
-  // Corpo do peixe (elipse) + cauda (triângulo).
-  final fishPaint = Paint()..color = _teal;
-  canvas.drawOval(
-    Rect.fromCenter(center: const Offset(236, 296), width: 240, height: 144),
-    fishPaint,
-  );
-  canvas.drawPath(
-    Path()
-      ..moveTo(356, 296)
-      ..lineTo(460, 210)
-      ..lineTo(460, 382)
-      ..close(),
-    fishPaint,
-  );
+    final wavePaint = Paint()
+      ..color = _white.withValues(alpha: 0.16)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 24
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(
+      Path()
+        ..moveTo(164, 760)
+        ..cubicTo(300, 700, 452, 826, 608, 760)
+        ..cubicTo(724, 712, 820, 728, 908, 784),
+      wavePaint,
+    );
+  }
 
-  // Olho.
-  canvas.drawCircle(const Offset(152, 280), 28, Paint()..color = Colors.white);
-  canvas.drawCircle(const Offset(152, 280), 14, Paint()..color = _bg);
+  final fishPaint = Paint()..color = _white;
+  final fishBody = Path()
+    ..moveTo(290, 472)
+    ..quadraticBezierTo(390, 360, 558, 378)
+    ..quadraticBezierTo(674, 390, 730, 474)
+    ..quadraticBezierTo(676, 560, 560, 574)
+    ..quadraticBezierTo(390, 594, 290, 472)
+    ..close();
+  canvas.drawPath(fishBody, fishPaint);
 
-  // Linha + anzol (dourado).
-  final goldStroke = Paint()
-    ..color = _gold
-    ..strokeWidth = 14
+  final tail = Path()
+    ..moveTo(688, 474)
+    ..lineTo(834, 358)
+    ..lineTo(834, 592)
+    ..close();
+  canvas.drawPath(tail, fishPaint);
+
+  final hookStroke = Paint()
+    ..color = _sand
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = transparentBackground ? 30 : 28
     ..strokeCap = StrokeCap.round
-    ..style = PaintingStyle.stroke;
-  canvas.drawLine(const Offset(256, 80), const Offset(256, 232), goldStroke);
-  canvas.drawCircle(const Offset(256, 80), 18, Paint()..color = _gold);
-  canvas.drawPath(
-    Path()
-      ..moveTo(256, 228)
-      ..quadraticBezierTo(256, 268, 210, 278),
-    Paint()
-      ..color = _gold
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke,
+    ..strokeJoin = StrokeJoin.round;
+  final hookTopY = transparentBackground ? 200.0 : 214.0;
+  final hookBottomY = transparentBackground ? 414.0 : 430.0;
+  final hookPath = Path()
+    ..moveTo(510, hookTopY)
+    ..lineTo(510, hookBottomY)
+    ..quadraticBezierTo(500, 500, 420, 540);
+  canvas.drawPath(hookPath, hookStroke);
+  canvas.drawCircle(
+    Offset(510, hookTopY - 24),
+    transparentBackground ? 34 : 30,
+    Paint()..color = _sand,
   );
 
-  // Onda da água.
+  final cutWave = Paint()
+    ..blendMode = BlendMode.clear
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = transparentBackground ? 26 : 22
+    ..strokeCap = StrokeCap.round;
+  canvas.saveLayer(const Rect.fromLTWH(0, 0, 1024, 1024), Paint());
+  canvas.drawPath(fishBody, fishPaint);
+  canvas.drawPath(tail, fishPaint);
   canvas.drawPath(
     Path()
-      ..moveTo(180, 320)
-      ..quadraticBezierTo(220, 305, 256, 320)
-      ..quadraticBezierTo(292, 335, 330, 320),
-    Paint()
-      ..color = _wave
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke,
+      ..moveTo(398, 500)
+      ..quadraticBezierTo(482, 468, 560, 504)
+      ..quadraticBezierTo(628, 536, 696, 500),
+    cutWave,
   );
+  canvas.restore();
+
+  if (transparentBackground) {
+    final subtleWave = Paint()
+      ..color = _white.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 18
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(
+      Path()
+        ..moveTo(276, 760)
+        ..quadraticBezierTo(398, 716, 512, 760)
+        ..quadraticBezierTo(638, 804, 756, 760),
+      subtleWave,
+    );
+  }
+
+  final image = await recorder.endRecording().toImage(1024, 1024);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  return data!.buffer.asUint8List();
 }
 
 void main() {
-  testWidgets('gera assets/icon/app_icon.png a partir do SVG', (tester) async {
-    late final Uint8List pngBytes;
+  testWidgets('gera os assets oficiais de launcher icon', (tester) async {
+    late final Uint8List fullIcon;
+    late final Uint8List foregroundIcon;
+
     await tester.runAsync(() async {
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, 1024, 1024));
-      _paintIcon(canvas);
-      final image = await recorder.endRecording().toImage(1024, 1024);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      pngBytes = data!.buffer.asUint8List();
+      fullIcon = await _renderIcon(transparentBackground: false);
+      foregroundIcon = await _renderIcon(transparentBackground: true);
     });
 
-    final file = File('assets/icon/app_icon.png');
-    file.writeAsBytesSync(pngBytes);
+    final fullIconFile = File('assets/icon/app_icon.png');
+    final foregroundIconFile = File('assets/icon/app_icon_foreground.png');
 
-    expect(file.existsSync(), isTrue);
-    expect(pngBytes.lengthInBytes, greaterThan(0));
+    fullIconFile.writeAsBytesSync(fullIcon);
+    foregroundIconFile.writeAsBytesSync(foregroundIcon);
+
+    expect(fullIconFile.existsSync(), isTrue);
+    expect(foregroundIconFile.existsSync(), isTrue);
+    expect(fullIcon.lengthInBytes, greaterThan(0));
+    expect(foregroundIcon.lengthInBytes, greaterThan(0));
   });
 }
