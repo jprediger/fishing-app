@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../models/establishment.dart';
 import '../services/catch_service.dart';
+import '../services/establishment_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
+import 'establishment_search_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
@@ -20,6 +23,9 @@ class HomeShell extends StatefulWidget {
   /// Serviço opcional repassado ao mapa.
   final WaterBodyService? waterBodyService;
 
+  /// Serviço opcional repassado à aba "Locais".
+  final EstablishmentService? establishmentService;
+
   /// Sessão atual; alimenta a aba "Eu". Opcional para os testes existentes.
   final AuthController? auth;
 
@@ -28,6 +34,7 @@ class HomeShell extends StatefulWidget {
     this.fishService,
     this.catchService,
     this.waterBodyService,
+    this.establishmentService,
     this.auth,
   });
 
@@ -36,29 +43,44 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  static const int _mapIndex = 0;
+
   int _currentIndex = 0;
 
-  late final List<Widget> _pages;
+  /// Estabelecimento que o usuário pediu para "ver no mapa" (aba Locais).
+  /// Repassado ao [MapScreen], que centraliza e marca o ponto.
+  Establishment? _focusedEstablishment;
 
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      MapScreen(
-        waterBodyService: widget.waterBodyService,
-        fishService: widget.fishService,
-        catchService: widget.catchService,
-        authToken: widget.auth?.token,
-      ),
-      SearchScreen(service: widget.fishService),
-      ProfileScreen(auth: widget.auth),
-    ];
+  /// Abre o mapa centralizado no estabelecimento escolhido na aba "Locais".
+  void _showEstablishmentOnMap(Establishment establishment) {
+    setState(() {
+      _focusedEstablishment = establishment;
+      _currentIndex = _mapIndex;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Construído a cada build para que mudanças de foco cheguem ao MapScreen.
+    final pages = <Widget>[
+      MapScreen(
+        waterBodyService: widget.waterBodyService,
+        fishService: widget.fishService,
+        catchService: widget.catchService,
+        establishmentService: widget.establishmentService,
+        authToken: widget.auth?.token,
+        focusEstablishment: _focusedEstablishment,
+      ),
+      SearchScreen(service: widget.fishService),
+      EstablishmentSearchScreen(
+        service: widget.establishmentService,
+        onShowOnMap: _showEstablishmentOnMap,
+      ),
+      ProfileScreen(auth: widget.auth),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -74,6 +96,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.search),
             selectedIcon: Icon(Icons.search),
             label: 'Buscar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.store_mall_directory_outlined),
+            selectedIcon: Icon(Icons.store_mall_directory),
+            label: 'Locais',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

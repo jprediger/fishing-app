@@ -8,6 +8,7 @@ import 'screens/auth_gate.dart';
 import 'screens/home_shell.dart';
 import 'services/auth_http_client.dart';
 import 'services/catch_service.dart';
+import 'services/establishment_service.dart';
 import 'services/fish_service.dart';
 import 'services/water_body_service.dart';
 import 'state/auth_controller.dart';
@@ -40,6 +41,7 @@ void main() {
   final fishService = FishService(client: httpClient);
   final catchService = CatchService(client: httpClient);
   final waterBodyService = WaterBodyService(client: httpClient);
+  final establishmentService = EstablishmentService(client: httpClient);
 
   // Lê a sessão salva e define o estado inicial (splash -> login/app).
   auth.bootstrap();
@@ -50,6 +52,7 @@ void main() {
       fishService: fishService,
       catchService: catchService,
       waterBodyService: waterBodyService,
+      establishmentService: establishmentService,
     ),
   );
 }
@@ -64,6 +67,9 @@ class FishingApp extends StatelessWidget {
   /// Serviço do mapa, injetado nos testes e no `main`.
   final WaterBodyService? waterBodyService;
 
+  /// Serviço de estabelecimentos, injetado nos testes e no `main`.
+  final EstablishmentService? establishmentService;
+
   /// Sessão do app. Quando presente, o `AuthGate` decide login ↔ app.
   final AuthController? auth;
 
@@ -72,6 +78,7 @@ class FishingApp extends StatelessWidget {
     this.fishService,
     this.catchService,
     this.waterBodyService,
+    this.establishmentService,
     this.auth,
   });
 
@@ -89,11 +96,14 @@ class FishingApp extends StatelessWidget {
               fishService: fishService ?? FishService(),
               catchService: catchService ?? CatchService(),
               waterBodyService: waterBodyService ?? WaterBodyService(),
+              establishmentService:
+                  establishmentService ?? EstablishmentService(),
             )
           : HomeShell(
               fishService: fishService,
               catchService: catchService,
               waterBodyService: waterBodyService,
+              establishmentService: establishmentService,
             ),
     );
   }

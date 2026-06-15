@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../services/catch_service.dart';
+import '../services/establishment_service.dart';
 import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
@@ -15,6 +16,7 @@ class AuthGate extends StatelessWidget {
   final FishService fishService;
   final CatchService catchService;
   final WaterBodyService waterBodyService;
+  final EstablishmentService establishmentService;
 
   const AuthGate({
     super.key,
@@ -22,6 +24,7 @@ class AuthGate extends StatelessWidget {
     required this.fishService,
     required this.catchService,
     required this.waterBodyService,
+    required this.establishmentService,
   });
 
   @override
@@ -40,6 +43,7 @@ class AuthGate extends StatelessWidget {
               fishService: fishService,
               catchService: catchService,
               waterBodyService: waterBodyService,
+              establishmentService: establishmentService,
             );
         }
       },
