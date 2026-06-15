@@ -48,6 +48,7 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 | **Corpo d'água / WaterBody** | Camada de referência geográfica (rio, lago, lagoa, açude, represa) populada por seed do OSM. A ser modelado. |
 | **WaterType** | Tipo de corpo d'água: `RIVER`, `LAKE`, `LAGOON`, `RESERVOIR`, `POND`. |
 | **Registro de pesca / CatchRecord** | Evento do usuário: 1 peixe pescado, ligado a um corpo d'água + ponto no mapa, com fotos, detalhes e clima. |
+| **Estabelecimento / Establishment** | Ponto de interesse de pesca (loja, pesqueiro, marina, rampa etc.) que pode ser associado opcionalmente pelo usuário a um registro de pesca, sem substituir o corpo d'água. |
 | **LocationVisibility** | Privacidade do ponto: `EXACT` (público) \| `RIVER_ONLY` (só o rio é público). Ver [ADR-0002](./adr/0002-privacidade-do-local-de-pesca.md). |
 | **FishingMethod** | Método de pescaria: `ARREMESSO`, `FLY`, `CORRICO`, `FUNDO`, `BOIA`, `OUTRO`. |
 | **FishingPurpose** | Finalidade: `SPORT` (esportiva) \| `CONSUMPTION` (consumo). |
@@ -55,6 +56,11 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 | **OSM** | OpenStreetMap — fonte de tiles do mapa e de dados de hidrografia. |
 | **Overpass API** | API de consulta de dados do OSM (usada para o seed de corpos d'água). |
 | **Open-Meteo** | API gratuita de clima — preenche o tempo do registro por lat/lon + horário. |
+
+## Relações de domínio
+
+- Um **CatchRecord** pertence a exatamente um **WaterBody**
+- Um **CatchRecord** pode ser associado a zero ou um **Establishment**, sempre por escolha explícita do usuário
 
 ## Comandos essenciais
 

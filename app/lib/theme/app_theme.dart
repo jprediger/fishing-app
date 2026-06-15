@@ -45,7 +45,7 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerHigh,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         clipBehavior: Clip.antiAlias,
       ),

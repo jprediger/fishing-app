@@ -158,17 +158,15 @@ class _SearchScreenState extends State<SearchScreen> {
           label: Text(label),
           selected: selected,
           onSelected: (_) => setState(() => _typeFilter = type),
-          backgroundColor: cs.primaryContainer.withValues(alpha: 0.45),
-          selectedColor: cs.surface,
+          backgroundColor: cs.surfaceContainerHigh,
+          selectedColor: cs.secondaryContainer,
           surfaceTintColor: Colors.transparent,
           labelStyle: TextStyle(
-            color: selected ? cs.onSurface : cs.onPrimary,
+            color: selected ? cs.onSecondaryContainer : cs.onSurface,
             fontWeight: FontWeight.w600,
           ),
           side: BorderSide(
-            color: selected
-                ? Colors.transparent
-                : cs.onPrimary.withValues(alpha: 0.55),
+            color: selected ? Colors.transparent : cs.outlineVariant,
           ),
         ),
       );

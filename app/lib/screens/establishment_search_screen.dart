@@ -174,17 +174,15 @@ class _EstablishmentSearchScreenState extends State<EstablishmentSearchScreen> {
           label: Text(label),
           selected: selected,
           onSelected: (_) => _onCategoryChanged(category),
-          backgroundColor: cs.primaryContainer.withValues(alpha: 0.45),
-          selectedColor: cs.surface,
+          backgroundColor: cs.surfaceContainerHigh,
+          selectedColor: cs.secondaryContainer,
           surfaceTintColor: Colors.transparent,
           labelStyle: TextStyle(
-            color: selected ? cs.onSurface : cs.onPrimary,
+            color: selected ? cs.onSecondaryContainer : cs.onSurface,
             fontWeight: FontWeight.w600,
           ),
           side: BorderSide(
-            color: selected
-                ? Colors.transparent
-                : cs.onPrimary.withValues(alpha: 0.55),
+            color: selected ? Colors.transparent : cs.outlineVariant,
           ),
         ),
       );
@@ -355,9 +353,10 @@ class _EstablishmentCard extends StatelessWidget {
                   children: [
                     Text(
                       establishment.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -420,17 +419,18 @@ class _CategoryAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = AppColors.markerEstablishment;
+    final cs = Theme.of(context).colorScheme;
+    final color = cs.secondaryContainer;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: color,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Icon(
         _iconForCategory(category),
-        color: AppColors.deep,
+        color: cs.onSecondaryContainer,
         size: size * 0.55,
       ),
     );
@@ -448,7 +448,7 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.markerEstablishment.withValues(alpha: 0.2),
+        color: cs.secondaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -456,7 +456,7 @@ class _CategoryBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: cs.onSurface,
+          color: cs.onSecondaryContainer,
         ),
       ),
     );
@@ -488,7 +488,9 @@ class _DetailRow extends StatelessWidget {
             '$label: ',
             style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(value, style: TextStyle(color: cs.onSurface)),
+          ),
         ],
       ),
     );
