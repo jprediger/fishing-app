@@ -1,5 +1,7 @@
 plugins {
 	id 'java'
+	id 'jacoco'
+	id 'com.diffplug.spotless' version '7.0.3'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -46,9 +48,41 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+spotless {
+	java {
+		target 'src/**/*.java'
+		palantirJavaFormat('2.50.0')
+		removeUnusedImports()
+		importOrder()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+}
+
+jacoco {
+	toolVersion = '0.8.12'
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
 }
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		html.required = true
+		xml.required = true
+	}
+}
+
+// Para travar a build abaixo de uma cobertura mínima, descomente e ajuste:
+// tasks.named('check') { dependsOn tasks.named('jacocoTestCoverageVerification') }
+// jacocoTestCoverageVerification {
+// 	violationRules {
+// 		rule { limit { minimum = 0.50 } }
+// 	}
+// }
 
 tasks.register('seed', JavaExec) {
 	group = 'application'
