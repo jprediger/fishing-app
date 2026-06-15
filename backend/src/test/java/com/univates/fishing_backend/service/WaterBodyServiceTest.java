@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.univates.fishing_backend.dto.WaterBodyResponseDTO;
 import com.univates.fishing_backend.entity.WaterType;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class WaterBodyServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().waterType()).isEqualTo(WaterType.RIVER);
         assertThat(result.getFirst().geometry().get("type").asText()).isEqualTo("LineString");
+        assertThat(result.getFirst().createdAt()).isEqualTo(OffsetDateTime.parse("2026-06-14T12:00:00Z"));
     }
 
     @Test
@@ -55,6 +57,7 @@ class WaterBodyServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().osmId()).isEqualTo(123L);
+        assertThat(result.getFirst().createdAt()).isEqualTo(OffsetDateTime.parse("2026-06-14T12:00:00Z"));
     }
 
     @Test
@@ -95,7 +98,7 @@ class WaterBodyServiceTest {
         when(row.getCenterLon()).thenReturn(-50.95);
         when(row.getCenterLat()).thenReturn(-30.05);
         when(row.getDistanceMeters()).thenReturn(123.4d);
-        when(row.getCreatedAt()).thenReturn(OffsetDateTime.parse("2026-06-14T12:00:00Z"));
+        when(row.getCreatedAt()).thenReturn(Instant.parse("2026-06-14T12:00:00Z"));
         when(row.getUpdatedAt()).thenReturn(null);
         return row;
     }

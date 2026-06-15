@@ -7,6 +7,7 @@ import com.univates.fishing_backend.repository.CatchRepository;
 import com.univates.fishing_backend.repository.FishRepository;
 import com.univates.fishing_backend.repository.UserRepository;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -18,9 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,16 +36,16 @@ public class CatchService {
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findAll(Pageable pageable, String requesterEmail, Long speciesId) {
         Page<CatchRecord> page = speciesId == null
-            ? catchRepository.findAll(pageable)
-            : catchRepository.findBySpecies_Id(speciesId, pageable);
+                ? catchRepository.findAll(pageable)
+                : catchRepository.findBySpecies_Id(speciesId, pageable);
         return page.map(record -> toDto(record, requesterEmail));
     }
 
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findMine(Pageable pageable, String requesterEmail, Long speciesId) {
         Page<CatchRecord> page = speciesId == null
-            ? catchRepository.findByUser_Email(requesterEmail, pageable)
-            : catchRepository.findByUser_EmailAndSpecies_Id(requesterEmail, speciesId, pageable);
+                ? catchRepository.findByUser_Email(requesterEmail, pageable)
+                : catchRepository.findByUser_EmailAndSpecies_Id(requesterEmail, speciesId, pageable);
         return page.map(record -> toDto(record, requesterEmail));
     }
 
@@ -90,93 +88,94 @@ public class CatchService {
     }
 
     private CatchRecord loadCatch(Long id) {
-        return catchRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Catch not found with id: " + id));
+        return catchRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Catch not found with id: " + id));
     }
 
     private User loadUser(String email) {
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+        return userRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 
     private Fish loadFish(Long id) {
-        return fishRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
+        return fishRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Fish not found with id: " + id));
     }
 
     private WaterBody loadWaterBody(Long id) {
-        return waterBodyRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Water body not found with id: " + id));
+        return waterBodyRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Water body not found with id: " + id));
     }
 
     private CatchRecord buildRecord(CatchRequestDTO dto, User user, Fish species, WaterBody waterBody) {
         return CatchRecord.builder()
-            .user(user)
-            .waterBody(waterBody)
-            .location(toPoint(dto.location()))
-            .locationVisibility(dto.locationVisibility())
-            .species(species)
-            .weightGrams(dto.weightGrams())
-            .lengthMm(dto.lengthMm())
-            .description(dto.description())
-            .fishingMethod(dto.fishingMethod())
-            .purpose(dto.purpose())
-            .caughtAt(dto.caughtAt())
-            .build();
+                .user(user)
+                .waterBody(waterBody)
+                .location(toPoint(dto.location()))
+                .locationVisibility(dto.locationVisibility())
+                .species(species)
+                .weightGrams(dto.weightGrams())
+                .lengthMm(dto.lengthMm())
+                .description(dto.description())
+                .fishingMethod(dto.fishingMethod())
+                .purpose(dto.purpose())
+                .caughtAt(dto.caughtAt())
+                .build();
     }
 
     private void applyWeather(CatchRecord record) {
         Optional<WeatherDTO> weather = weatherClient.fetch(
-            record.getLocation().getY(),
-            record.getLocation().getX(),
-            record.getCaughtAt());
+                record.getLocation().getY(), record.getLocation().getX(), record.getCaughtAt());
         record.setWeather(weather.map(this::toWeather).orElse(null));
     }
 
     private Weather toWeather(WeatherDTO dto) {
         return Weather.builder()
-            .temperatureC(dto.temperatureC())
-            .condition(dto.condition())
-            .windSpeedKmh(dto.windSpeedKmh())
-            .windDirectionDeg(dto.windDirectionDeg())
-            .humidityPct(dto.humidityPct())
-            .pressureHpa(dto.pressureHpa())
-            .code(dto.code())
-            .capturedAt(dto.capturedAt())
-            .source(dto.source())
-            .build();
+                .temperatureC(dto.temperatureC())
+                .condition(dto.condition())
+                .windSpeedKmh(dto.windSpeedKmh())
+                .windDirectionDeg(dto.windDirectionDeg())
+                .humidityPct(dto.humidityPct())
+                .pressureHpa(dto.pressureHpa())
+                .code(dto.code())
+                .capturedAt(dto.capturedAt())
+                .source(dto.source())
+                .build();
     }
 
     private CatchResponseDTO toDto(CatchRecord record, String requesterEmail) {
         boolean mine = isOwner(record, requesterEmail);
         LocationDTO location = record.getLocationVisibility() == LocationVisibility.EXACT || mine
-            ? toLocationDTO(record.getLocation())
-            : null;
+                ? toLocationDTO(record.getLocation())
+                : null;
         return new CatchResponseDTO(
-            record.getId(),
-            toFishDto(record.getSpecies()),
-            toWaterBodyDto(record.getWaterBody()),
-            location,
-            record.getLocationVisibility(),
-            record.getWeightGrams(),
-            record.getLengthMm(),
-            record.getDescription(),
-            record.getFishingMethod(),
-            record.getPurpose(),
-            record.getCaughtAt(),
-            toWeatherDto(record.getWeather()),
-            mine,
-            record.getPhotos().stream().map(this::toPhotoDto).toList(),
-            record.getCreatedAt(),
-            record.getUpdatedAt()
-        );
+                record.getId(),
+                toFishDto(record.getSpecies()),
+                toWaterBodyDto(record.getWaterBody()),
+                location,
+                record.getLocationVisibility(),
+                record.getWeightGrams(),
+                record.getLengthMm(),
+                record.getDescription(),
+                record.getFishingMethod(),
+                record.getPurpose(),
+                record.getCaughtAt(),
+                toWeatherDto(record.getWeather()),
+                mine,
+                record.getPhotos().stream().map(this::toPhotoDto).toList(),
+                record.getCreatedAt(),
+                record.getUpdatedAt());
     }
 
     private boolean isOwner(CatchRecord record, String requesterEmail) {
         return record.getUser() != null
-            && record.getUser().getEmail() != null
-            && requesterEmail != null
-            && record.getUser().getEmail().equalsIgnoreCase(requesterEmail);
+                && record.getUser().getEmail() != null
+                && requesterEmail != null
+                && record.getUser().getEmail().equalsIgnoreCase(requesterEmail);
     }
 
     private void ensureOwner(CatchRecord record, String requesterEmail) {
@@ -187,7 +186,8 @@ public class CatchService {
 
     private Point toPoint(LocationDTO location) {
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
-        Point point = geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(location.lon(), location.lat()));
+        Point point =
+                geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(location.lon(), location.lat()));
         point.setSRID(4326);
         return point;
     }
@@ -199,55 +199,47 @@ public class CatchService {
 
     private FishResponseDTO toFishDto(Fish fish) {
         return new FishResponseDTO(
-            fish.getId(),
-            fish.getName(),
-            fish.getDescription(),
-            fish.getRegion(),
-            fish.getType(),
-            fish.getIcon() == null ? null : new IconDTO(fish.getIcon().getPath()),
-            fish.getCreatedAt(),
-            fish.getUpdatedAt()
-        );
+                fish.getId(),
+                fish.getName(),
+                fish.getDescription(),
+                fish.getRegion(),
+                fish.getType(),
+                fish.getIcon() == null ? null : new IconDTO(fish.getIcon().getPath()),
+                fish.getCreatedAt(),
+                fish.getUpdatedAt());
     }
 
     private WaterBodyResponseDTO toWaterBodyDto(WaterBody body) {
         Point centroid = body.getGeom() == null ? null : (Point) body.getGeom().getCentroid();
         return new WaterBodyResponseDTO(
-            body.getId(),
-            body.getName(),
-            body.getWaterType(),
-            null,
-            body.getOsmId(),
-            body.getSource(),
-            centroid == null ? null : centroid.getX(),
-            centroid == null ? null : centroid.getY(),
-            null,
-            body.getCreatedAt(),
-            body.getUpdatedAt()
-        );
+                body.getId(),
+                body.getName(),
+                body.getWaterType(),
+                null,
+                body.getOsmId(),
+                body.getSource(),
+                centroid == null ? null : centroid.getX(),
+                centroid == null ? null : centroid.getY(),
+                null,
+                body.getCreatedAt(),
+                body.getUpdatedAt());
     }
 
     private WeatherDTO toWeatherDto(Weather weather) {
         if (weather == null) return null;
         return new WeatherDTO(
-            weather.getTemperatureC(),
-            weather.getCondition(),
-            weather.getWindSpeedKmh(),
-            weather.getWindDirectionDeg(),
-            weather.getHumidityPct(),
-            weather.getPressureHpa(),
-            weather.getCode(),
-            weather.getCapturedAt(),
-            weather.getSource()
-        );
+                weather.getTemperatureC(),
+                weather.getCondition(),
+                weather.getWindSpeedKmh(),
+                weather.getWindDirectionDeg(),
+                weather.getHumidityPct(),
+                weather.getPressureHpa(),
+                weather.getCode(),
+                weather.getCapturedAt(),
+                weather.getSource());
     }
 
     private CatchPhotoResponseDTO toPhotoDto(CatchPhoto photo) {
-        return new CatchPhotoResponseDTO(
-            photo.getId(),
-            photo.getFilePath(),
-            photo.getPosition(),
-            photo.getCreatedAt()
-        );
+        return new CatchPhotoResponseDTO(photo.getId(), photo.getFilePath(), photo.getPosition(), photo.getCreatedAt());
     }
 }

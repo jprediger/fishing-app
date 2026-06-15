@@ -37,6 +37,7 @@ dependencies:
 
   # Map rendering using OpenStreetMap tiles (no API key required).
   flutter_map: ^7.0.2
+  flutter_map_cancellable_tile_provider: ^3.0.2
   latlong2: ^0.9.1
 
   # HTTP client used to talk to the Spring Boot backend.

@@ -2,12 +2,11 @@ package com.univates.fishing_backend.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
-import lombok.*;
-
+import jakarta.persistence.Enumerated;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import lombok.*;
 
 @Embeddable
 @Data

@@ -3,21 +3,29 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../config/app_log.dart';
 import '../main.dart';
 import '../models/water_body.dart';
-import '../services/api_exception.dart';
+import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import 'catch_form_screen.dart';
 
 class MapScreen extends StatefulWidget {
-  final WaterBodyService? service;
+  final WaterBodyService? waterBodyService;
+  final FishService? fishService;
 
   /// Test hook: pre-seeds draft point when mark mode opens.
   final LatLng? debugInitialDraftPoint;
 
-  const MapScreen({super.key, this.service, this.debugInitialDraftPoint});
+  const MapScreen({
+    super.key,
+    this.waterBodyService,
+    this.fishService,
+    this.debugInitialDraftPoint,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -32,6 +40,8 @@ class _MapScreenState extends State<MapScreen> {
   static const double _viewportPadding = 0.2;
 
   final MapController _mapController = MapController();
+  final CancellableNetworkTileProvider _tileProvider =
+      CancellableNetworkTileProvider();
   Timer? _viewportDebounce;
   Timer? _nearestDebounce;
   late final WaterBodyService _service;
@@ -54,14 +64,14 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _service = widget.service ?? WaterBodyService();
+    _service = widget.waterBodyService ?? WaterBodyService();
   }
 
   @override
   void dispose() {
     _viewportDebounce?.cancel();
     _nearestDebounce?.cancel();
-    if (widget.service == null) {
+    if (widget.waterBodyService == null) {
       _service.dispose();
     }
     _mapController.dispose();
@@ -359,7 +369,11 @@ class _MapScreenState extends State<MapScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CatchFormScreen(point: point, waterBody: waterBody),
+        builder: (_) => CatchFormScreen(
+          point: point,
+          waterBody: waterBody,
+          fishService: widget.fishService,
+        ),
       ),
     );
   }
@@ -386,7 +400,12 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                tileProvider: _tileProvider,
                 userAgentPackageName: 'com.example.mobile_app',
+                // Tiles que falham são re-tentados ao voltarem à viewport e o
+                // erro é agregado pelo AppLog (em vez de poluir o console).
+                evictErrorTileStrategy: EvictErrorTileStrategy.notVisible,
+                errorTileCallback: (tile, error, _) => AppLog.tileError(error),
               ),
               if (_lineStrings.isNotEmpty)
                 PolylineLayer<Object>(polylines: _lineStrings),

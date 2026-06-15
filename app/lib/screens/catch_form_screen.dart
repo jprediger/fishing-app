@@ -14,11 +14,13 @@ import 'fish_picker_sheet.dart';
 class CatchFormScreen extends StatefulWidget {
   final LatLng point;
   final WaterBody waterBody;
+  final FishService? fishService;
 
   const CatchFormScreen({
     super.key,
     required this.point,
     required this.waterBody,
+    this.fishService,
   });
 
   @override
@@ -37,7 +39,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
       showDragHandle: true,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.85,
-        child: FishPickerSheet(service: FishService()),
+        child: FishPickerSheet(service: widget.fishService),
       ),
     );
 
@@ -168,7 +170,9 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'O wizard completo entra aqui com detalhes, método e revisão.',
-                    style: TextStyle(color: Colors.black.withValues(alpha: 0.7)),
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),

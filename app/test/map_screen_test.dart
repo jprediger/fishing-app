@@ -25,7 +25,10 @@ const _waterBodiesJson = '''
 ''';
 
 Widget _wrap(WaterBodyService service, {LatLng? draftPoint}) => MaterialApp(
-  home: MapScreen(service: service, debugInitialDraftPoint: draftPoint),
+  home: MapScreen(
+    waterBodyService: service,
+    debugInitialDraftPoint: draftPoint,
+  ),
 );
 
 void main() {

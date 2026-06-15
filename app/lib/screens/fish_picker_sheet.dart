@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/fish.dart';
-import '../services/api_exception.dart';
 import '../services/fish_service.dart';
 
 /// Bottom sheet reutilizável para selecionar uma espécie do catálogo.
@@ -66,7 +65,8 @@ class _FishPickerSheetState extends State<FishPickerSheet> {
     final q = _query.toLowerCase();
     return _fish.where((fish) {
       final matchesType = _typeFilter == null || fish.type == _typeFilter;
-      final matchesQuery = q.isEmpty ||
+      final matchesQuery =
+          q.isEmpty ||
           fish.name.toLowerCase().contains(q) ||
           (fish.region?.toLowerCase().contains(q) ?? false) ||
           fish.type.label.toLowerCase().contains(q);
@@ -172,7 +172,7 @@ class _FishPickerSheetState extends State<FishPickerSheet> {
     return ListView.separated(
       shrinkWrap: true,
       itemCount: results.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final fish = results[index];
         return ListTile(
@@ -181,10 +181,12 @@ class _FishPickerSheetState extends State<FishPickerSheet> {
             child: const Icon(Icons.set_meal),
           ),
           title: Text(fish.name),
-          subtitle: Text([
-            fish.type.label,
-            if (fish.region != null && fish.region!.isNotEmpty) fish.region!,
-          ].join(' • ')),
+          subtitle: Text(
+            [
+              fish.type.label,
+              if (fish.region != null && fish.region!.isNotEmpty) fish.region!,
+            ].join(' • '),
+          ),
           onTap: () => Navigator.of(context).pop(fish),
         );
       },

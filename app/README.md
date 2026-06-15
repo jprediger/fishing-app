@@ -54,13 +54,13 @@ O `ApiConfig` (`lib/config/api_config.dart`) escolhe a URL base conforme a plata
 
 | Plataforma                  | URL base usada            |
 |-----------------------------|---------------------------|
-| Emulador Android            | `http://10.0.2.2:8080`    |
-| Web / desktop / iOS sim.    | `http://localhost:8080`   |
+| Emulador Android            | `http://10.0.2.2:8081`    |
+| Web / desktop / iOS sim.    | `http://localhost:8081`   |
 
 Para sobrescrever (ex.: backend em outra máquina da rede):
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8081
 ```
 
 Sem backend, login e mapas falham.

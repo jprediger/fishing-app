@@ -3,6 +3,9 @@ package com.univates.fishing_backend.service;
 import com.univates.fishing_backend.dto.WaterBodyResponseDTO;
 import com.univates.fishing_backend.entity.WaterType;
 import com.univates.fishing_backend.repository.WaterBodyRepository;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,8 +71,8 @@ public class WaterBodyService {
                 row.getCenterLon(),
                 row.getCenterLat(),
                 row.getDistanceMeters(),
-                row.getCreatedAt(),
-                row.getUpdatedAt());
+                toOffsetDateTime(row.getCreatedAt()),
+                toOffsetDateTime(row.getUpdatedAt()));
     }
 
     private double zoomToTolerance(int zoom) {
@@ -85,6 +88,10 @@ public class WaterBodyService {
         } catch (Exception e) {
             throw new IllegalStateException("Falha ao converter geometria para GeoJSON", e);
         }
+    }
+
+    private OffsetDateTime toOffsetDateTime(Instant instant) {
+        return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     record Bbox(double minLon, double minLat, double maxLon, double maxLat) {

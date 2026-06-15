@@ -23,10 +23,10 @@ O app e o backend rodam de forma independente. Para o fluxo completo, suba o bac
 ```bash
 cd backend
 docker compose up -d     # sobe o PostgreSQL
-./gradlew bootRun        # sobe a API em http://localhost:8080
+./gradlew bootRun        # sobe a API em http://localhost:8081
 ```
 
-Documentação da API (com a aplicação no ar): http://localhost:8080/docs
+Documentação da API (com a aplicação no ar): http://localhost:8081/docs
 
 Detalhes completos em **[backend/README.md](backend/README.md)**.
 
@@ -35,16 +35,35 @@ Detalhes completos em **[backend/README.md](backend/README.md)**.
 ```bash
 cd app
 flutter pub get
-flutter run              # roda em modo mock (não precisa do backend no ar)
+flutter run              # roda o app; para dados reais, deixe o backend no ar
 ```
 
-Para conectar no backend real em vez dos dados mockados:
+Para apontar explicitamente para outro backend:
 
 ```bash
-flutter run --dart-define=USE_MOCK=false
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8081
 ```
 
 Detalhes completos em **[app/README.md](app/README.md)**.
+
+## Validação
+
+Antes de considerar uma implementação pronta, rode a validação completa do repositório:
+
+```bash
+bash scripts/validate.sh
+```
+
+Esse comando executa as checagens do frontend e do backend em sequência. Os prefixos mais usados são:
+
+```bash
+bash scripts/validate.sh --frontend
+bash scripts/validate.sh --backend
+bash scripts/validate.sh --fix
+bash scripts/validate.sh --fast
+```
+
+Recomendação prática: rode `bash scripts/validate.sh` após qualquer implementação e antes de commitar ou abrir PR.
 
 ## Pré-requisitos
 

@@ -17,8 +17,9 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
   migrations com **Flyway**, banco **PostgreSQL**. Auth com OAuth2 resource
   server + JWT (`security/`). API documentada via OpenAPI/Scalar.
 - **`app/`** — Flutter. Mapa com `flutter_map` + tiles do OpenStreetMap.
-  Acesso ao backend via `services/` (HTTP). Tem **modo mock** (`USE_MOCK`,
-  default `true`) para rodar sem backend.
+  Acesso ao backend via `services/` (HTTP). A URL base vem de `ApiConfig`
+  e aponta para `localhost:8081` por padrão, com `10.0.2.2:8081` no emulador
+  Android.
 
 ## Estado atual (atualizar conforme evolui)
 
@@ -64,8 +65,8 @@ cd backend && docker compose up -d
 # Backend
 cd backend && ./gradlew bootRun
 
-# App (modo mock, default)
+# App
 cd app && flutter run
-# App apontando para backend real
-cd app && flutter run --dart-define=USE_MOCK=false
+# App apontando para outro backend
+cd app && flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8081
 ```

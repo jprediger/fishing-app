@@ -85,7 +85,9 @@ class AuthService {
         },
       );
     } catch (_) {
-      throw const ApiException('Não foi possível conectar ao servidor.');
+      throw ApiException(
+        'Não foi possível conectar ao servidor em $_baseUrl/api/users/me.',
+      );
     }
 
     if (response.statusCode == 200) return AuthUser.fromJson(_decode(response));
@@ -119,7 +121,9 @@ class AuthService {
         body: jsonEncode(body),
       );
     } catch (_) {
-      throw const ApiException('Não foi possível conectar ao servidor.');
+      throw ApiException(
+        'Não foi possível conectar ao servidor em $_baseUrl/api/users/me.',
+      );
     }
 
     if (response.statusCode == 200) return AuthUser.fromJson(_decode(response));
@@ -139,9 +143,10 @@ class AuthService {
   }
 
   Future<http.Response> _post(String path, Map<String, dynamic> body) async {
+    final uri = Uri.parse('$_baseUrl$path');
     try {
       return await _client.post(
-        Uri.parse('$_baseUrl$path'),
+        uri,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -149,7 +154,7 @@ class AuthService {
         body: jsonEncode(body),
       );
     } catch (_) {
-      throw const ApiException('Não foi possível conectar ao servidor.');
+      throw ApiException('Não foi possível conectar ao servidor em $uri.');
     }
   }
 

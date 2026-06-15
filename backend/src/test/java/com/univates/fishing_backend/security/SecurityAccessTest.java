@@ -5,8 +5,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.univates.fishing_backend.config.TestcontainersConfiguration;
@@ -129,6 +131,15 @@ class SecurityAccessTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"demo@fishing.local\",\"password\":\"demo12345\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void corsPreflight_fromLocalhostPort_isAllowed() throws Exception {
+        mockMvc.perform(options("/api/fish")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     private FishResponseDTO sampleFish() {

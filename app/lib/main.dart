@@ -1,5 +1,9 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 
+import 'config/api_config.dart';
+import 'config/app_log.dart';
 import 'screens/auth_gate.dart';
 import 'screens/home_shell.dart';
 import 'services/auth_http_client.dart';
@@ -10,7 +14,16 @@ import 'state/auth_controller.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Erros do framework e erros assíncronos não capturados passam a sair em
+  // formato único e enxuto (ver AppLog), em vez de dumps crus no console.
+  FlutterError.onError = AppLog.flutterError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.zoneError(error, stack);
+    return true;
+  };
+
   final auth = AuthController();
+  AppLog.info('API base URL: ${ApiConfig.baseUrl}');
 
   // Cliente HTTP autenticado: injeta o Bearer e desloga em 401.
   final httpClient = AuthHttpClient(

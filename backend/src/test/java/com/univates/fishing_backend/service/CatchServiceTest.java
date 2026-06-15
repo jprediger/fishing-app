@@ -56,7 +56,8 @@ class CatchServiceTest {
         when(userRepository.findByEmail("demo@fishing.local")).thenReturn(Optional.of(sampleUser()));
         when(fishRepository.findById(1L)).thenReturn(Optional.of(sampleFish()));
         when(waterBodyRepository.findById(2L)).thenReturn(Optional.of(sampleWaterBody()));
-        when(weatherClient.fetch(anyDouble(), anyDouble(), org.mockito.ArgumentMatchers.any(OffsetDateTime.class))).thenReturn(Optional.empty());
+        when(weatherClient.fetch(anyDouble(), anyDouble(), org.mockito.ArgumentMatchers.any(OffsetDateTime.class)))
+                .thenReturn(Optional.empty());
         when(catchRepository.save(any())).thenAnswer(invocation -> {
             CatchRecord record = invocation.getArgument(0);
             record.setId(99L);

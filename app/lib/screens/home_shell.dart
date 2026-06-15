@@ -39,7 +39,10 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _pages = [
-      MapScreen(service: widget.waterBodyService),
+      MapScreen(
+        waterBodyService: widget.waterBodyService,
+        fishService: widget.fishService,
+      ),
       SearchScreen(service: widget.fishService),
       ProfileScreen(auth: widget.auth),
     ];

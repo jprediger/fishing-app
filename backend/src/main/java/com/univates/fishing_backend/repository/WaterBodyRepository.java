@@ -1,7 +1,7 @@
 package com.univates.fishing_backend.repository;
 
 import com.univates.fishing_backend.entity.WaterBody;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -99,8 +99,8 @@ public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
 
         Double getDistanceMeters();
 
-        OffsetDateTime getCreatedAt();
+        Instant getCreatedAt();
 
-        OffsetDateTime getUpdatedAt();
+        Instant getUpdatedAt();
     }
 }

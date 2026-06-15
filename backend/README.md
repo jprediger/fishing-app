@@ -61,7 +61,7 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-A API sobe em `http://localhost:8080`.
+A API sobe em `http://localhost:8081`.
 
 ### Seeds
 
@@ -88,16 +88,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 Com a aplicação rodando:
 
-- **Scalar UI:** http://localhost:8080/docs
-- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+- **Scalar UI:** http://localhost:8081/docs
+- **OpenAPI JSON:** http://localhost:8081/v3/api-docs
 
 A UI é renderizada via [Scalar](https://scalar.com/) carregado por CDN. O `ScalarController` serve um HTML estático que aponta para o JSON gerado pelo springdoc em `/v3/api-docs`.
 
 ## Observabilidade (Actuator)
 
-- **Health:** http://localhost:8080/actuator/health
-- **Info:** http://localhost:8080/actuator/info
-- **Métricas (Prometheus):** http://localhost:8080/actuator/prometheus
+- **Health:** http://localhost:8081/actuator/health
+- **Info:** http://localhost:8081/actuator/info
+- **Métricas (Prometheus):** http://localhost:8081/actuator/prometheus
 
 ## Endpoints
 
@@ -114,7 +114,7 @@ Os três recursos seguem o mesmo padrão CRUD paginado. Parâmetros de paginaç�
 | DELETE | `/api/fish/{id}` | Remove           | 204     |
 
 ```bash
-curl -X POST http://localhost:8080/api/fish \
+curl -X POST http://localhost:8081/api/fish \
   -H "Content-Type: application/json" \
   -d '{
         "name":"Tucunaré",
@@ -135,7 +135,7 @@ curl -X POST http://localhost:8080/api/fish \
 
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  "http://localhost:8080/api/water-bodies?bbox=-51.5,-30.5,-51.0,-30.0"
+  "http://localhost:8081/api/water-bodies?bbox=-51.5,-30.5,-51.0,-30.0"
 ```
 
 `bbox` usa formato `minLon,minLat,maxLon,maxLat`. Se omitido, a API usa viewport padrão do RS.
@@ -151,7 +151,7 @@ curl -H "Authorization: Bearer <token>" \
 | DELETE | `/api/users/{id}` | Remove           | 204     |
 
 ```bash
-curl -X POST http://localhost:8080/api/users \
+curl -X POST http://localhost:8081/api/users \
   -H "Content-Type: application/json" \
   -d '{"name":"John Smith","email":"john@example.com","password":"password123"}'
 ```
@@ -169,7 +169,7 @@ E-mail é único (conflito retorna `409`); a senha exige no mínimo 6 caracteres
 | DELETE | `/api/produtos/{id}` | Remove           | 204     |
 
 ```bash
-curl -X POST http://localhost:8080/api/produtos \
+curl -X POST http://localhost:8081/api/produtos \
   -H "Content-Type: application/json" \
   -d '{"nome":"Vara de pesca","descricao":"Carbono 2.4m","preco":199.90,"quantidadeEstoque":10}'
 ```

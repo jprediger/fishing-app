@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 /// - Em web/desktop/iOS simulador, `localhost` funciona normalmente.
 ///
 /// Pode ser sobrescrito em tempo de compilação com:
-/// `flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080`
+/// `flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8081`
 class ApiConfig {
   const ApiConfig._();
 
@@ -21,8 +21,8 @@ class ApiConfig {
   static String get baseUrl {
     if (_override.isNotEmpty) return _override;
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:8080';
+      return 'http://10.0.2.2:8081';
     }
-    return 'http://localhost:8080';
+    return 'http://localhost:8081';
   }
 }

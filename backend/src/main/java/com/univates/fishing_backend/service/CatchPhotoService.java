@@ -6,14 +6,13 @@ import com.univates.fishing_backend.entity.CatchRecord;
 import com.univates.fishing_backend.exception.ResourceNotFoundException;
 import com.univates.fishing_backend.repository.CatchPhotoRepository;
 import com.univates.fishing_backend.repository.CatchRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,23 +35,24 @@ public class CatchPhotoService {
             MultipartFile file = files.get(i);
             String relativePath = storageService.store(file);
             CatchPhoto photo = CatchPhoto.builder()
-                .catchRecord(record)
-                .filePath(relativePath)
-                .position(startPosition + i)
-                .build();
+                    .catchRecord(record)
+                    .filePath(relativePath)
+                    .position(startPosition + i)
+                    .build();
             savedPhotos.add(catchPhotoRepository.save(photo));
         }
         record.getPhotos().addAll(savedPhotos);
         return record.getPhotos().stream()
-            .sorted(java.util.Comparator.comparingInt(CatchPhoto::getPosition))
-            .map(this::toDto)
-            .toList();
+                .sorted(java.util.Comparator.comparingInt(CatchPhoto::getPosition))
+                .map(this::toDto)
+                .toList();
     }
 
     public void deletePhoto(Long catchId, Long photoId, String requesterEmail) {
         CatchRecord record = loadOwnedCatch(catchId, requesterEmail);
-        CatchPhoto photo = catchPhotoRepository.findByIdAndCatchRecordId(photoId, catchId)
-            .orElseThrow(() -> new ResourceNotFoundException("Photo not found: " + photoId));
+        CatchPhoto photo = catchPhotoRepository
+                .findByIdAndCatchRecordId(photoId, catchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Photo not found: " + photoId));
         storageService.delete(photo.getFilePath());
         record.getPhotos().remove(photo);
         catchPhotoRepository.delete(photo);
@@ -66,8 +66,9 @@ public class CatchPhotoService {
     }
 
     private CatchRecord loadOwnedCatch(Long catchId, String requesterEmail) {
-        CatchRecord record = catchRepository.findById(catchId)
-            .orElseThrow(() -> new ResourceNotFoundException("Catch not found with id: " + catchId));
+        CatchRecord record = catchRepository
+                .findById(catchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Catch not found with id: " + catchId));
         if (!record.getUser().getEmail().equalsIgnoreCase(requesterEmail)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the owner can manage photos");
         }
@@ -75,11 +76,6 @@ public class CatchPhotoService {
     }
 
     private CatchPhotoResponseDTO toDto(CatchPhoto photo) {
-        return new CatchPhotoResponseDTO(
-            photo.getId(),
-            photo.getFilePath(),
-            photo.getPosition(),
-            photo.getCreatedAt()
-        );
+        return new CatchPhotoResponseDTO(photo.getId(), photo.getFilePath(), photo.getPosition(), photo.getCreatedAt());
     }
 }
