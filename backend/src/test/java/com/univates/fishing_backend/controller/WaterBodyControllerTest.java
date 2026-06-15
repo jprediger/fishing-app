@@ -58,6 +58,7 @@ class WaterBodyControllerTest {
                 -50.95,
                 -30.05,
                 123.4d,
+                7L,
                 OffsetDateTime.parse("2026-06-14T12:00:00Z"),
                 null);
         when(waterBodyService.findInBbox(null, null)).thenReturn(List.of(dto));
@@ -95,6 +96,7 @@ class WaterBodyControllerTest {
                 -50.95,
                 -30.05,
                 321.0d,
+                null,
                 OffsetDateTime.parse("2026-06-14T12:00:00Z"),
                 null);
         when(waterBodyService.findNearest(-30.05, -50.95)).thenReturn(java.util.Optional.of(dto));

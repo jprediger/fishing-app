@@ -104,6 +104,20 @@ class CatchPhoto {
   }
 }
 
+class CatchAuthor {
+  final int id;
+  final String name;
+
+  const CatchAuthor({required this.id, required this.name});
+
+  factory CatchAuthor.fromJson(Map<String, dynamic> json) {
+    return CatchAuthor(
+      id: (json['id'] as num).toInt(),
+      name: json['name'] as String,
+    );
+  }
+}
+
 class CatchWeather {
   final double? temperatureC;
   final WeatherCondition? condition;
@@ -159,6 +173,7 @@ class CatchRecord {
   final List<CatchPhoto> photos;
   final CatchWeather? weather;
   final bool mine;
+  final CatchAuthor? author;
 
   const CatchRecord({
     required this.id,
@@ -175,6 +190,7 @@ class CatchRecord {
     this.photos = const [],
     this.weather,
     this.mine = false,
+    this.author,
   });
 
   factory CatchRecord.fromJson(Map<String, dynamic> json) {
@@ -208,6 +224,9 @@ class CatchRecord {
           ? CatchWeather.fromJson(json['weather'] as Map<String, dynamic>)
           : null,
       mine: json['mine'] as bool? ?? false,
+      author: json['author'] is Map<String, dynamic>
+          ? CatchAuthor.fromJson(json['author'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

@@ -154,6 +154,7 @@ class SecurityAccessTest {
     private CatchResponseDTO sampleCatch() {
         return new CatchResponseDTO(
                 1L,
+                new com.univates.fishing_backend.dto.AuthorDTO(1L, "Demo"),
                 sampleFish(),
                 sampleWaterBody(),
                 new LocationDTO(-30.0, -51.0),
@@ -183,6 +184,7 @@ class SecurityAccessTest {
                     "OSM",
                     -50.95,
                     -30.05,
+                    null,
                     null,
                     OffsetDateTime.parse("2026-06-14T12:00:00Z"),
                     null);

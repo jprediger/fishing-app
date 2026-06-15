@@ -13,7 +13,9 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,19 @@ public class CatchService {
 
     @Transactional(readOnly = true)
     public Page<CatchResponseDTO> findAll(Pageable pageable, String requesterEmail, Long speciesId, String bbox) {
+        return findAll(pageable, requesterEmail, speciesId, bbox, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CatchResponseDTO> findAll(
+            Pageable pageable, String requesterEmail, Long speciesId, String bbox, Long waterBodyId) {
+        if (waterBodyId != null) {
+            Pageable feedPageable = PageRequest.of(
+                    pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+            Page<CatchRecord> page = catchRepository.findByWaterBody_Id(waterBodyId, feedPageable);
+            return page.map(record -> toDto(record, requesterEmail));
+        }
+
         if (bbox == null || bbox.isBlank()) {
             return findAll(pageable, requesterEmail, speciesId);
         }
@@ -166,6 +181,7 @@ public class CatchService {
                 : null;
         return new CatchResponseDTO(
                 record.getId(),
+                toAuthorDto(record.getUser()),
                 toFishDto(record.getSpecies()),
                 toWaterBodyDto(record.getWaterBody()),
                 location,
@@ -181,6 +197,11 @@ public class CatchService {
                 record.getPhotos().stream().map(this::toPhotoDto).toList(),
                 record.getCreatedAt(),
                 record.getUpdatedAt());
+    }
+
+    private AuthorDTO toAuthorDto(User user) {
+        if (user == null) return null;
+        return new AuthorDTO(user.getId(), user.getName());
     }
 
     private boolean isOwner(CatchRecord record, String requesterEmail) {
@@ -232,6 +253,7 @@ public class CatchService {
                 body.getSource(),
                 centroid == null ? null : centroid.getX(),
                 centroid == null ? null : centroid.getY(),
+                null,
                 null,
                 body.getCreatedAt(),
                 body.getUpdatedAt());

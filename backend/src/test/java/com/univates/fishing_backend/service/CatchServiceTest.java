@@ -28,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 class CatchServiceTest {
@@ -71,6 +72,9 @@ class CatchServiceTest {
 
         assertThat(result.id()).isEqualTo(99L);
         assertThat(result.mine()).isTrue();
+        assertThat(result.author()).isNotNull();
+        assertThat(result.author().id()).isEqualTo(10L);
+        assertThat(result.author().name()).isEqualTo("Demo");
         assertThat(result.location()).isNotNull();
         assertThat(result.location().lat()).isEqualTo(-30.0);
         assertThat(result.waterBody().id()).isEqualTo(2L);
@@ -143,6 +147,22 @@ class CatchServiceTest {
                         anyDouble(),
                         eq(1L),
                         any(org.springframework.data.domain.Pageable.class));
+    }
+
+    @Test
+    void findAll_withWaterBodyId_filtersByWaterBodyAndSortsNewestFirst() {
+        when(catchRepository.findByWaterBody_Id(eq(2L), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(sampleRecord(LocationVisibility.EXACT, "owner@fishing.local"))));
+
+        var result = catchService.findAll(
+                org.springframework.data.domain.PageRequest.of(0, 20), "demo@fishing.local", null, null, 2L);
+
+        assertThat(result).hasSize(1);
+        ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(catchRepository).findByWaterBody_Id(eq(2L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     private CatchRequestDTO sampleRequest() {

@@ -32,6 +32,7 @@ class WaterBody {
   final double? centerLon;
   final double? centerLat;
   final double? distanceMeters;
+  final int? catchCount;
 
   const WaterBody({
     required this.id,
@@ -43,6 +44,7 @@ class WaterBody {
     this.centerLon,
     this.centerLat,
     this.distanceMeters,
+    this.catchCount,
   });
 
   factory WaterBody.fromJson(Map<String, dynamic> json) {
@@ -56,6 +58,7 @@ class WaterBody {
       centerLon: (json['centerLon'] as num?)?.toDouble(),
       centerLat: (json['centerLat'] as num?)?.toDouble(),
       distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
+      catchCount: (json['catchCount'] as num?)?.toInt(),
     );
   }
 

@@ -1,53 +1,14 @@
 package com.univates.fishing_backend.repository;
 
 import com.univates.fishing_backend.entity.WaterBody;
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
+public interface WaterBodyRepository extends JpaRepository<WaterBody, Long>, WaterBodyRepositoryCustom {
 
     Optional<WaterBody> findByOsmId(Long osmId);
-
-    @Query(
-            value =
-                    """
-        SELECT
-            id,
-            name,
-            water_type AS waterType,
-            ST_AsGeoJSON(
-                CASE
-                    WHEN :simplifyTolerance IS NULL OR :simplifyTolerance = 0 THEN geom
-                    ELSE ST_SimplifyPreserveTopology(geom, :simplifyTolerance)
-                END
-            ) AS geomGeoJson,
-            osm_id AS osmId,
-            source,
-            ST_X(ST_Centroid(geom)) AS centerLon,
-            ST_Y(ST_Centroid(geom)) AS centerLat,
-            CAST(NULL AS double precision) AS distanceMeters,
-            created_at AS createdAt,
-            updated_at AS updatedAt
-        FROM water_body
-        WHERE ST_Intersects(
-            geom,
-            ST_MakeEnvelope(:minLon, :minLat, :maxLon, :maxLat, 4326)
-        )
-        ORDER BY id
-        LIMIT :maxFeatures
-        """,
-            nativeQuery = true)
-    List<WaterBodyViewportRow> findInBbox(
-            @Param("minLon") double minLon,
-            @Param("minLat") double minLat,
-            @Param("maxLon") double maxLon,
-            @Param("maxLat") double maxLat,
-            @Param("simplifyTolerance") Double simplifyTolerance,
-            @Param("maxFeatures") int maxFeatures);
 
     @Query(
             value =
@@ -65,6 +26,13 @@ public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
                 geom::geography,
                 ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
             ) AS distanceMeters,
+            CAST(
+                (
+                    SELECT COUNT(*)
+                    FROM catch_record c
+                    WHERE c.water_body_id = water_body.id
+                ) AS bigint
+            ) AS catch_count,
             created_at AS createdAt,
             updated_at AS updatedAt
         FROM water_body
@@ -99,8 +67,10 @@ public interface WaterBodyRepository extends JpaRepository<WaterBody, Long> {
 
         Double getDistanceMeters();
 
-        Instant getCreatedAt();
+        Long getCatchCount();
 
-        Instant getUpdatedAt();
+        java.time.Instant getCreatedAt();
+
+        java.time.Instant getUpdatedAt();
     }
 }

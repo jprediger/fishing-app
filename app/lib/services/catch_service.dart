@@ -71,6 +71,26 @@ class CatchService {
     return _decodePage(response);
   }
 
+  Future<List<CatchRecord>> listByWaterBody({
+    required int waterBodyId,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final queryParameters = <String, String>{
+      'page': '$page',
+      'size': '$size',
+      'waterBodyId': '$waterBodyId',
+      'sort': 'createdAt,desc',
+    };
+
+    final response = await _get(
+      '/api/catches',
+      queryParameters: queryParameters,
+    );
+
+    return _decodePage(response);
+  }
+
   Future<List<CatchRecord>> mine({
     String? bbox,
     int? speciesId,

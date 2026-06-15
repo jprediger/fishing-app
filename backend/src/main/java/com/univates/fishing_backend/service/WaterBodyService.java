@@ -71,6 +71,7 @@ public class WaterBodyService {
                 row.getCenterLon(),
                 row.getCenterLat(),
                 row.getDistanceMeters(),
+                row.getCatchCount(),
                 toOffsetDateTime(row.getCreatedAt()),
                 toOffsetDateTime(row.getUpdatedAt()));
     }

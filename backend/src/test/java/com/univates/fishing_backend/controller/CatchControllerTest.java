@@ -95,6 +95,17 @@ class CatchControllerTest {
                 .andExpect(jsonPath("$.location.lon").value(-51.0));
     }
 
+    @Test
+    @WithMockUser(username = "demo@fishing.local", roles = "USER")
+    void findAll_withWaterBodyId_usesFeedOrdering() throws Exception {
+        when(catchService.findAll(any(), anyString(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(sampleCatch(true))));
+
+        mockMvc.perform(get("/api/catches").param("waterBodyId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1));
+    }
+
     private CatchRequestDTO sampleRequest() {
         return new CatchRequestDTO(
                 1L,
@@ -112,6 +123,7 @@ class CatchControllerTest {
     private CatchResponseDTO sampleCatch(boolean exact) {
         return new CatchResponseDTO(
                 1L,
+                new com.univates.fishing_backend.dto.AuthorDTO(10L, "Demo"),
                 new FishResponseDTO(
                         1L, "Tucunaré", "desc", "RS", FishType.FRESHWATER, null, OffsetDateTime.now(), null),
                 new WaterBodyResponseDTO(
@@ -123,6 +135,7 @@ class CatchControllerTest {
                         "OSM",
                         -50.95,
                         -30.05,
+                        null,
                         null,
                         OffsetDateTime.now(),
                         null),

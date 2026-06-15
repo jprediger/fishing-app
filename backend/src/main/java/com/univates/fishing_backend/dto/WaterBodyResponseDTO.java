@@ -14,5 +14,6 @@ public record WaterBodyResponseDTO(
         Double centerLon,
         Double centerLat,
         Double distanceMeters,
+        Long catchCount,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

@@ -13,6 +13,8 @@ public interface CatchRepository extends JpaRepository<CatchRecord, Long> {
 
     Page<CatchRecord> findBySpecies_Id(Long speciesId, Pageable pageable);
 
+    Page<CatchRecord> findByWaterBody_Id(Long waterBodyId, Pageable pageable);
+
     Page<CatchRecord> findByUser_EmailAndSpecies_Id(String email, Long speciesId, Pageable pageable);
 
     @Query(

@@ -21,3 +21,6 @@ Planos concluídos ficam em `done/`; os pendentes, em `todo/`.
 | [0003](./done/0003-seed-especies-rs.md) | Seed de espécies de peixes do RS | Implementado |
 | [0004](./todo/0004-registro-de-pesca.md) | Registro de pesca (`catch_record`): backend, clima, fotos e app | Proposto |
 | [0005](./done/0005-nearest-marcar-ponto-e-mapa-real.md) | Corpo d'água mais próximo (`nearest`), marcar ponto, mapa em dados reais e desempenho de viewport | Implementado |
+| [0006](./done/0006-design-system-tema-claro-escuro.md) | Design system + tema claro/escuro | Implementado |
+| [0007](./todo/0007-pescas-no-mapa.md) | Pescas no mapa: marcadores próprios vs. de outros + contagem por corpo d'água | Proposto |
+| [0008](./todo/0008-feed-de-registros-do-corpo-dagua.md) | Feed de registros do corpo d'água ("Ver registros") | Proposto |

@@ -16,6 +16,7 @@ import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../widgets/map_marker.dart';
 import 'catch_detail_screen.dart';
+import 'catch_feed_screen.dart';
 import 'catch_form_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -23,6 +24,8 @@ class MapScreen extends StatefulWidget {
   final FishService? fishService;
   final CatchService? catchService;
   final String? authToken;
+  final bool showTiles;
+  final double? debugInitialZoom;
 
   /// Test hook: pre-seeds draft point when mark mode opens.
   final LatLng? debugInitialDraftPoint;
@@ -33,6 +36,8 @@ class MapScreen extends StatefulWidget {
     this.fishService,
     this.catchService,
     this.authToken,
+    this.showTiles = true,
+    this.debugInitialZoom,
     this.debugInitialDraftPoint,
   });
 
@@ -187,9 +192,7 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    if (widget.catchService != null) {
-      unawaited(_loadCatches(target: target, seq: seq));
-    }
+    unawaited(_loadCatches(target: target, seq: seq));
   }
 
   Future<void> _loadCatches({required _Bbox target, required int seq}) async {
@@ -200,16 +203,12 @@ class _MapScreenState extends State<MapScreen> {
         page: 0,
         size: 200,
       );
-      if (!mounted ||
-          seq != _viewportRequestSeq ||
-          currentSeq != _catchRequestSeq) {
+      if (!mounted || currentSeq != _catchRequestSeq) {
         return;
       }
       setState(() => _catches = catches);
     } on ApiException {
-      if (!mounted ||
-          seq != _viewportRequestSeq ||
-          currentSeq != _catchRequestSeq) {
+      if (!mounted || currentSeq != _catchRequestSeq) {
         return;
       }
       setState(() => _catches = const []);
@@ -311,9 +310,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _recenter() {
-    _mapController.move(_initialCenter, _initialZoom);
+    _mapController.move(_initialCenter, _effectiveInitialZoom);
     _scheduleViewportLoad(_mapController.camera, force: true);
   }
+
+  double get _effectiveInitialZoom => widget.debugInitialZoom ?? _initialZoom;
 
   /// Seleciona o corpo d'água tocado, exibindo o card inferior. Não move
   /// nem reposiciona o mapa — apenas destaca o pin e abre o card.
@@ -354,6 +355,15 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Abre o wizard de registro para o corpo d'água selecionado no mapa,
   /// usando o centro do corpo d'água como ponto inicial.
+  void _refreshAfterCatchSaved(Object? value) {
+    if (!mounted) return;
+    if (value is CatchRecord) {
+      setState(() => _selectedBody = null);
+      _exitMarkMode();
+    }
+    _scheduleViewportLoad(_mapController.camera, force: true);
+  }
+
   void _openCatchFormForBody(WaterBody body) {
     final point = body.centerLocation ?? _fallbackCenter(body);
 
@@ -367,7 +377,22 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
         )
-        .then((_) => _scheduleViewportLoad(_mapController.camera, force: true));
+        .then(_refreshAfterCatchSaved);
+  }
+
+  void _openCatchFeed(WaterBody body) {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => CatchFeedScreen(
+              body: body,
+              catchService: _catchService,
+              fishService: widget.fishService,
+              authToken: widget.authToken,
+            ),
+          ),
+        )
+        .then(_refreshAfterCatchSaved);
   }
 
   void _openCatchForm() {
@@ -385,7 +410,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
         )
-        .then((_) => _scheduleViewportLoad(_mapController.camera, force: true));
+        .then(_refreshAfterCatchSaved);
   }
 
   void _openCatchDetail(CatchRecord record) {
@@ -483,7 +508,7 @@ class _MapScreenState extends State<MapScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _initialCenter,
-              initialZoom: _initialZoom,
+              initialZoom: _effectiveInitialZoom,
               onTap: _onMapTap,
               onPositionChanged: (camera, hasGesture) {
                 _syncCameraZoom(camera.zoom);
@@ -494,15 +519,17 @@ class _MapScreenState extends State<MapScreen> {
               onMapReady: _onMapReady,
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                tileProvider: _tileProvider,
-                userAgentPackageName: 'com.example.mobile_app',
-                // Tiles que falham são re-tentados ao voltarem à viewport e o
-                // erro é agregado pelo AppLog (em vez de poluir o console).
-                evictErrorTileStrategy: EvictErrorTileStrategy.notVisible,
-                errorTileCallback: (tile, error, _) => AppLog.tileError(error),
-              ),
+              if (widget.showTiles)
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  tileProvider: _tileProvider,
+                  userAgentPackageName: 'com.example.mobile_app',
+                  // Tiles que falham são re-tentados ao voltarem à viewport e o
+                  // erro é agregado pelo AppLog (em vez de poluir o console).
+                  evictErrorTileStrategy: EvictErrorTileStrategy.notVisible,
+                  errorTileCallback: (tile, error, _) =>
+                      AppLog.tileError(error),
+                ),
               if (_lineStrings.isNotEmpty)
                 PolylineLayer<Object>(polylines: _lineStrings),
               if (_polygons.isNotEmpty)
@@ -654,6 +681,7 @@ class _MapScreenState extends State<MapScreen> {
           child: _SelectionBody(
             body: body,
             onCreate: () => _openCatchFormForBody(body),
+            onViewRecords: () => _openCatchFeed(body),
             distanceLabel: null,
             onClose: () => setState(() => _selectedBody = null),
           ),
@@ -779,6 +807,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: _SelectionBody(
                     body: _nearestBody!,
                     onCreate: _openCatchForm,
+                    onViewRecords: () => _openCatchFeed(_nearestBody!),
                     distanceLabel: _formatDistance(
                       _nearestBody!.distanceMeters,
                     ),
@@ -840,6 +869,7 @@ class _MapScreenState extends State<MapScreen> {
               child: MapMarker(
                 kind: MapMarkerKind.waterBody,
                 selected: _selectedBody?.id == body.id,
+                badgeCount: body.catchCount,
               ),
             ),
           ),
@@ -871,21 +901,27 @@ class _MapScreenState extends State<MapScreen> {
 
   List<Marker> get _catchMarkers {
     if (_markingMode) return const [];
-    return _catches.map((record) {
-      final point =
-          record.location ??
-          record.waterBody.centerLocation ??
-          _fallbackCenter(record.waterBody);
-      return Marker(
-        point: point,
-        width: MapMarker.footprint,
-        height: MapMarker.footprint,
-        child: GestureDetector(
-          onTap: () => _openCatchDetail(record),
-          child: const MapMarker(kind: MapMarkerKind.catchRecord),
-        ),
-      );
-    }).toList();
+    return _catches
+        .where((record) {
+          return record.locationVisibility == LocationVisibility.exact &&
+              record.location != null;
+        })
+        .map((record) {
+          return Marker(
+            point: record.location!,
+            width: MapMarker.footprint,
+            height: MapMarker.footprint,
+            child: GestureDetector(
+              onTap: () => _openCatchDetail(record),
+              child: MapMarker(
+                kind: record.mine
+                    ? MapMarkerKind.catchRecordMine
+                    : MapMarkerKind.catchRecord,
+              ),
+            ),
+          );
+        })
+        .toList();
   }
 
   List<Polyline<Object>> _linesForBody(WaterBody body) {
@@ -1050,6 +1086,7 @@ class _SelectionLoading extends StatelessWidget {
 class _SelectionBody extends StatelessWidget {
   final WaterBody body;
   final VoidCallback onCreate;
+  final VoidCallback onViewRecords;
 
   /// Distância até o ponto marcado. Nulo quando o card vem de um toque direto
   /// no corpo d'água (sem ponto de referência).
@@ -1061,6 +1098,7 @@ class _SelectionBody extends StatelessWidget {
   const _SelectionBody({
     required this.body,
     required this.onCreate,
+    required this.onViewRecords,
     required this.distanceLabel,
     this.onClose,
   });
@@ -1111,16 +1149,33 @@ class _SelectionBody extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: onViewRecords,
+                  child: Text(
+                    body.catchCount == null
+                        ? 'Ver registros'
+                        : 'Ver registros (${body.catchCount})',
+                  ),
+                ),
               ),
-              onPressed: onCreate,
-              child: const Text('Criar registro aqui'),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: onCreate,
+                  child: const Text('Criar registro aqui'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

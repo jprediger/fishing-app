@@ -36,6 +36,7 @@ class WaterBodyServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().waterType()).isEqualTo(WaterType.RIVER);
         assertThat(result.getFirst().geometry().get("type").asText()).isEqualTo("LineString");
+        assertThat(result.getFirst().catchCount()).isEqualTo(7L);
         assertThat(result.getFirst().createdAt()).isEqualTo(OffsetDateTime.parse("2026-06-14T12:00:00Z"));
     }
 
@@ -57,6 +58,7 @@ class WaterBodyServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().osmId()).isEqualTo(123L);
+        assertThat(result.getFirst().catchCount()).isEqualTo(7L);
         assertThat(result.getFirst().createdAt()).isEqualTo(OffsetDateTime.parse("2026-06-14T12:00:00Z"));
     }
 
@@ -98,6 +100,7 @@ class WaterBodyServiceTest {
         when(row.getCenterLon()).thenReturn(-50.95);
         when(row.getCenterLat()).thenReturn(-30.05);
         when(row.getDistanceMeters()).thenReturn(123.4d);
+        when(row.getCatchCount()).thenReturn(7L);
         when(row.getCreatedAt()).thenReturn(Instant.parse("2026-06-14T12:00:00Z"));
         when(row.getUpdatedAt()).thenReturn(null);
         return row;
