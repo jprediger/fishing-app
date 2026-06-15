@@ -45,6 +45,7 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 |---|---|
 | **Fish / Espécie** | Espécie de peixe no catálogo (não é um peixe individual). |
 | **Descoberta por espécie** | Fluxo em que o usuário entra por uma **Espécie** e explora **Corpos d'água** ou **Registros de pesca** associados a ela. |
+| **Agrupamento por corpo d'água** | Projeção que resume **Registros de pesca** de uma **Espécie** por **WaterBody**, incluindo volume e recência. |
 | **FishType** | Classificação da água da espécie: `FRESHWATER`, `SALTWATER`, `BRACKISH`. |
 | **Corpo d'água / WaterBody** | Camada de referência geográfica (rio, lago, lagoa, açude, represa) populada por seed do OSM. A ser modelado. |
 | **WaterType** | Tipo de corpo d'água: `RIVER`, `LAKE`, `LAGOON`, `RESERVOIR`, `POND`. |
@@ -65,7 +66,15 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 - A navegação de descoberta por **Espécie** pode listar **Corpos d'água** ou **Registros de pesca** dessa espécie
 - A **Descoberta por espécie** começa por uma **Espécie** e abre uma tela com resumo da espécie e resultados abaixo
 - A aba **Espécies** começa com uma lista pesquisável de **Espécies**; tocar em uma espécie abre a **Descoberta por espécie**
+- Na lista raiz de **Espécies**, o sinal de atividade principal é a quantidade de **Corpos d'água** com **Registros de pesca** daquela espécie
+- A lista raiz de **Espécies** mantém ordenação alfabética por padrão; atividade não redefine o ranking
+- Na lista raiz de **Espécies**, espécies sem atividade aparecem com um estado textual explícito, como `Sem registros ainda`
 - Um **CatchRecord** com **LocationVisibility = RIVER_ONLY** continua elegível para descoberta por **Espécie** e para agrupamento por **WaterBody**; apenas o ponto exato permanece oculto
+- A **Descoberta por espécie** pode abrir o **Mapa** com contexto da espécie selecionada, inclusive quando ainda não existirem **Registros de pesca**
+- O botão `Ver no mapa` na **Descoberta por espécie** pode servir só para centralizar um **WaterBody**, sem aplicar filtro visual de **Espécie** no **Mapa**
+- O drill-down de um **WaterBody** dentro da **Descoberta por espécie** mostra apenas **Registros de pesca** da **Espécie** selecionada
+- No drill-down **Espécie → WaterBody → Registros**, o título principal é o **WaterBody** e o contexto secundário explicita a **Espécie** e a quantidade filtrada de **Registros de pesca**
+- O modo padrão da **Descoberta por espécie** depende de **Agrupamento por corpo d'água** servido pelo backend, não calculado no app
 - A proximidade entre **CatchRecord** e **Establishment** serve para sugestão durante a criação, não para definir pertencimento
 - A associação entre **CatchRecord** e **Establishment** só é permitida quando o ponto da pesca está dentro de um raio curto do estabelecimento
 - Só **Establishments** das categorias **PESQUEIRO** e **CLUBE** podem receber associação explícita de um **CatchRecord**
@@ -73,6 +82,11 @@ app/        Flutter (mobile)  ──HTTP──▶  backend/  Spring Boot ──�
 - O raio permitido para associar **CatchRecord** a **Establishment** é definido no backend e exibido pelo app ao usuário
 - O valor inicial desse raio permitido é **200 m**
 - **Establishments** de categorias não associáveis continuam visíveis como pontos de interesse, mas não exibem ações de criar registro ou ver registros associados
+- Em um **Establishment** associável, visitantes veem apenas **CatchRecords** públicos associados; o dono continua vendo os próprios registros associados conforme as regras gerais de privacidade
+- A associação entre **CatchRecord** e **Establishment** pode ser adicionada, trocada ou removida em edição, desde que continue respeitando categoria elegível e raio permitido
+- Nesta fase, o ponto de um **CatchRecord** não é editável após a criação
+- Ao iniciar a criação por um **Establishment** associável, o app entra em modo de marcar ponto no mapa já centrado nesse estabelecimento e com a associação pré-marcada
+- Se o ponto marcado sair do raio permitido do **Establishment** pré-marcado, o app mantém o estabelecimento visível, porém desmarcado e indisponível até o ponto voltar ao raio
 
 ## Exemplo de diálogo
 

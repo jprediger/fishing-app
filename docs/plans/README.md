@@ -24,3 +24,5 @@ Planos concluídos ficam em `done/`; os pendentes, em `todo/`.
 | [0006](./done/0006-design-system-tema-claro-escuro.md) | Design system + tema claro/escuro | Implementado |
 | [0007](./todo/0007-pescas-no-mapa.md) | Pescas no mapa: marcadores próprios vs. de outros + contagem por corpo d'água | Proposto |
 | [0008](./todo/0008-feed-de-registros-do-corpo-dagua.md) | Feed de registros do corpo d'água ("Ver registros") | Proposto |
+| [0010](./todo/0010-estabelecimento-opcional-no-registro-de-pesca.md) | Estabelecimento opcional no registro de pesca | Proposto |
+| [0011](./todo/0011-refactor-aba-especies-descoberta.md) | Refactor da aba Buscar para Espécies + descoberta por espécie | Proposto |

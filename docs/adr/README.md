@@ -17,3 +17,4 @@ discussão já resolvida — e, quando precisar, saiba *por que* foi decidido as
 |---|---|---|
 | [0001](./0001-pontos-de-pesca-postgis.md) | Modelar pontos de pesca com PostGIS | Aceito |
 | [0002](./0002-privacidade-do-local-de-pesca.md) | Privacidade do local de pesca | Aceito |
+| [0003](./0003-associacao-opcional-de-catch-record-a-establishment.md) | Associar opcionalmente um registro de pesca a um estabelecimento | Aceito |

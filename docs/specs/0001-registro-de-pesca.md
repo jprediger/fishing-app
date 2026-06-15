@@ -2,7 +2,7 @@
 
 - **Status:** Proposto
 - **Data:** 2026-06-14
-- **Relacionado:** [ADR-0001 (PostGIS)](../adr/0001-pontos-de-pesca-postgis.md), [ADR-0002 (privacidade do local)](../adr/0002-privacidade-do-local-de-pesca.md), [Plano 0001 (water bodies + seed OSM)](../plans/0001-pontos-de-pesca-seed-osm.md)
+- **Relacionado:** [ADR-0001 (PostGIS)](../adr/0001-pontos-de-pesca-postgis.md), [ADR-0002 (privacidade do local)](../adr/0002-privacidade-do-local-de-pesca.md), [ADR-0003 (associação a estabelecimento)](../adr/0003-associacao-opcional-de-catch-record-a-establishment.md), [Plano 0001 (water bodies + seed OSM)](../plans/0001-pontos-de-pesca-seed-osm.md)
 
 ## Problema
 
@@ -12,7 +12,7 @@ espécie conhecida da região, com fotos e detalhes do peixe e do clima.
 
 ## Conceitos (e como se relacionam)
 
-Há **dois** conceitos geográficos — não confundir:
+Há **três** conceitos geográficos — não confundir:
 
 1. **`water_body` (corpo d'água)** — camada de **referência**, populada por seed
    do OpenStreetMap (rios, lagos, lagoas, açudes, represas do RS). Ver
@@ -20,9 +20,15 @@ Há **dois** conceitos geográficos — não confundir:
    no plano original — renomeado para evitar ambiguidade com "registro de pesca".)*
 2. **`catch_record` (registro de pesca / "uma pesca")** — **evento do usuário**.
    Sempre referencia um `water_body` e tem um ponto exato marcado no mapa.
+3. **`establishment` (estabelecimento)** — ponto de interesse do mapa que pode
+   ser associado opcionalmente a um `catch_record`, sem substituir o
+   `water_body`, quando a pesca ocorreu naquele local ou em seu entorno
+   imediato.
 
 ```
 usuario ──< catch_record >── water_body (rio/lago do seed)
+                 │
+                 ├── establishment? (pesqueiro/clube elegível)
                  │
                  ├── species  ──▶ fish (catálogo / seed de espécies do RS)
                  ├── weather  (automático via Open-Meteo)
@@ -37,6 +43,7 @@ usuario ──< catch_record >── water_body (rio/lago do seed)
 | Clima | **Automático via API** (Open-Meteo, gratuito, sem chave) por lat/lon + horário. |
 | Espécie | **Só da seed.** FK obrigatória para `fish`. Sem texto livre. |
 | Localização | **Sempre** marca no mapa. Usuário escolhe expor o **ponto exato** ou só o **rio** (ver ADR-0002). |
+| Estabelecimento | **Opcional.** Usuário pode associar 0..1 `establishment`, sempre de forma explícita, apenas para categorias elegíveis e dentro de um raio curto configurado. |
 | Finalidade | `SPORT` (esportiva) ou `CONSUMPTION` (consumo). |
 
 ## Modelo de dados
@@ -47,6 +54,7 @@ usuario ──< catch_record >── water_body (rio/lago do seed)
 | `id` | BIGINT PK | |
 | `user_id` | FK → `usuario` | dono do registro, NOT NULL |
 | `water_body_id` | FK → `water_body` | rio/lago, NOT NULL (sempre marcado) |
+| `establishment_id` | FK → `establishment` | opcional; só categorias elegíveis e dentro do raio permitido |
 | `location` | `geometry(Point,4326)` | ponto exato marcado no mapa, NOT NULL |
 | `location_visibility` | enum | `EXACT` \| `RIVER_ONLY` (ver ADR-0002) |
 | `species_id` | FK → `fish` | NOT NULL (só da seed) |
@@ -129,7 +137,7 @@ todas as espécies do seed. O seletor lista tudo.
 |---|---|---|
 | `POST` | `/api/catches` | cria registro (autenticado) |
 | `POST` | `/api/catches/{id}/photos` | upload de fotos |
-| `GET` | `/api/catches` | lista pública (respeita privacidade; filtros: bbox, espécie) |
+| `GET` | `/api/catches` | lista pública (respeita privacidade; filtros: bbox, espécie, estabelecimento) |
 | `GET` | `/api/catches/{id}` | detalhe (respeita privacidade) |
 | `GET` | `/api/catches/mine` | registros do usuário logado |
 | `DELETE` | `/api/catches/{id}` | remove (apenas dono) |
@@ -137,8 +145,13 @@ todas as espécies do seed. O seletor lista tudo.
 ## Integração no app (visão)
 
 - Fluxo de criação: marcar ponto no mapa → escolher visibilidade (exato/rio) →
-  selecionar espécie (da seed) → peso/comprimento/descrição → método + finalidade
-  → fotos → salvar (clima vem automático).
+  escolher `water_body` e, quando elegível, associar opcionalmente um
+  `establishment` sugerido por proximidade → selecionar espécie (da seed) →
+  peso/comprimento/descrição → método + finalidade → fotos → salvar (clima vem
+  automático).
+- Ao iniciar pelo card de um `PESQUEIRO` ou `CLUBE`, o app entra em modo de
+  marcar ponto já centrado nesse estabelecimento e com a associação
+  pré-selecionada enquanto o ponto permanecer dentro do raio permitido.
 - No mapa: marcadores de pescas. `RIVER_ONLY` aparece sobre o corpo d'água
   (centroide), sinalizado como aproximado.
 
@@ -151,6 +164,9 @@ todas as espécies do seed. O seletor lista tudo.
 ## Critérios de aceite
 
 - [ ] Usuário cria um registro marcando ponto no mapa + corpo d'água.
+- [ ] Usuário pode associar opcionalmente um `PESQUEIRO` ou `CLUBE` elegível ao registro.
+- [ ] O app só oferece estabelecimentos elegíveis dentro do raio configurado.
+- [ ] O feed de um estabelecimento mostra apenas registros explicitamente associados a ele.
 - [ ] Pode ocultar o ponto exato deixando público só o rio (e isso é respeitado no JSON).
 - [ ] Espécie selecionada da seed (FK obrigatória).
 - [ ] Peso, comprimento, descrição, método e finalidade salvos.
