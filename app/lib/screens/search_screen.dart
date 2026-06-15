@@ -65,7 +65,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final q = _query.toLowerCase();
     return _allFish.where((f) {
       final matchesType = _typeFilter == null || f.type == _typeFilter;
-      final matchesQuery = q.isEmpty ||
+      final matchesQuery =
+          q.isEmpty ||
           f.name.toLowerCase().contains(q) ||
           (f.region?.toLowerCase().contains(q) ?? false) ||
           f.type.label.toLowerCase().contains(q);
@@ -242,14 +243,23 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            _DetailRow(icon: Icons.water, label: 'Habitat', value: fish.type.label),
+            _DetailRow(
+              icon: Icons.water,
+              label: 'Habitat',
+              value: fish.type.label,
+            ),
             if (fish.region != null && fish.region!.isNotEmpty)
               _DetailRow(
-                  icon: Icons.place, label: 'Região', value: fish.region!),
+                icon: Icons.place,
+                label: 'Região',
+                value: fish.region!,
+              ),
             if (fish.description != null && fish.description!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(fish.description!,
-                  style: const TextStyle(height: 1.4, color: Colors.black87)),
+              Text(
+                fish.description!,
+                style: const TextStyle(height: 1.4, color: Colors.black87),
+              ),
             ],
           ],
         ),
@@ -297,15 +307,20 @@ class _FishCard extends StatelessWidget {
                           Flexible(
                             child: Row(
                               children: [
-                                const Icon(Icons.place_outlined,
-                                    size: 14, color: Colors.black45),
+                                const Icon(
+                                  Icons.place_outlined,
+                                  size: 14,
+                                  color: Colors.black45,
+                                ),
                                 const SizedBox(width: 2),
                                 Flexible(
                                   child: Text(
                                     fish.region!,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                        fontSize: 12, color: Colors.black54),
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -409,8 +424,11 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _DetailRow(
-      {required this.icon, required this.label, required this.value});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -420,8 +438,7 @@ class _DetailRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
           Expanded(child: Text(value)),
         ],
       ),
@@ -452,9 +469,11 @@ class _EmptyState extends StatelessWidget {
           children: [
             Icon(icon, size: 56, color: Colors.black26),
             const SizedBox(height: 16),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black54),
+            ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 16),
               FilledButton.icon(

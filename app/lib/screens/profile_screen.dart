@@ -30,10 +30,10 @@ class ProfileScreen extends StatelessWidget {
         children: [
           _buildHeader(context, user),
           const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-              children: const [
+              children: [
                 _StatCard(label: 'Capturas', value: '0', icon: Icons.set_meal),
                 SizedBox(width: 12),
                 _StatCard(label: 'Pontos', value: '0', icon: Icons.place),
@@ -45,9 +45,13 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 24),
           const _SectionTitle('Atividade'),
           const _ProfileTile(
-              icon: Icons.history, title: 'Histórico de pescarias'),
+            icon: Icons.history,
+            title: 'Histórico de pescarias',
+          ),
           const _ProfileTile(
-              icon: Icons.bookmark_border, title: 'Pontos salvos'),
+            icon: Icons.bookmark_border,
+            title: 'Pontos salvos',
+          ),
           const SizedBox(height: 12),
           const _SectionTitle('Conta'),
           _ProfileTile(
@@ -67,9 +71,9 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _openEdit(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EditProfileScreen(auth: auth!)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => EditProfileScreen(auth: auth!)));
   }
 
   Widget _buildHeader(BuildContext context, AuthUser? user) {
@@ -133,8 +137,10 @@ class ProfileScreen extends StatelessWidget {
               if (user != null && user.isAdmin) ...[
                 const SizedBox(height: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(20),
@@ -178,11 +184,17 @@ class _StatCard extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.primary),
               const SizedBox(height: 8),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w800)),
-              Text(label,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
             ],
           ),
         ),
@@ -234,8 +246,10 @@ class _ProfileTile extends StatelessWidget {
             ),
             child: Icon(icon, color: AppColors.primary, size: 20),
           ),
-          title: Text(title,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           trailing: const Icon(Icons.chevron_right, color: Colors.black26),
           onTap: onTap,
         ),

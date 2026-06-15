@@ -23,8 +23,11 @@ const _loginBody = {
   },
 };
 
-http.Response _ok(Object body) => http.Response(jsonEncode(body), 200,
-    headers: {'content-type': 'application/json; charset=utf-8'});
+http.Response _ok(Object body) => http.Response(
+  jsonEncode(body),
+  200,
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
 
 AuthController _controller(MockClient client, TokenStorage storage) =>
     AuthController(
@@ -46,15 +49,23 @@ void main() {
 
     test('com sessão salva -> authenticated', () async {
       final storage = TokenStorage(store: FakeStore());
-      await storage.save(const AuthSession(
-        token: 'saved',
-        expiresIn: 10,
-        user: AuthUser(
-            id: 1, name: 'A', email: 'a@a.com', role: UserRole.user),
-      ));
+      await storage.save(
+        const AuthSession(
+          token: 'saved',
+          expiresIn: 10,
+          user: AuthUser(
+            id: 1,
+            name: 'A',
+            email: 'a@a.com',
+            role: UserRole.user,
+          ),
+        ),
+      );
 
       final auth = _controller(
-          MockClient((_) async => http.Response('', 404)), storage);
+        MockClient((_) async => http.Response('', 404)),
+        storage,
+      );
       await auth.bootstrap();
       expect(auth.status, AuthStatus.authenticated);
       expect(auth.token, 'saved');
@@ -64,8 +75,10 @@ void main() {
   group('login', () {
     test('sucesso -> authenticated + persiste token', () async {
       final store = FakeStore();
-      final auth = _controller(MockClient((_) async => _ok(_loginBody)),
-          TokenStorage(store: store));
+      final auth = _controller(
+        MockClient((_) async => _ok(_loginBody)),
+        TokenStorage(store: store),
+      );
 
       final ok = await auth.login('demo@fishing.local', 'demo12345');
       expect(ok, isTrue);
@@ -110,7 +123,9 @@ void main() {
     test('logout limpa sessão e storage', () async {
       final store = FakeStore();
       final auth = _controller(
-          MockClient((_) async => _ok(_loginBody)), TokenStorage(store: store));
+        MockClient((_) async => _ok(_loginBody)),
+        TokenStorage(store: store),
+      );
       await auth.login('demo@fishing.local', 'demo12345');
 
       await auth.logout();

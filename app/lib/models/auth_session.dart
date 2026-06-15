@@ -23,9 +23,6 @@ class AuthSession {
   }
 
   /// Copia a sessão trocando apenas o usuário (após editar o perfil).
-  AuthSession copyWith({AuthUser? user}) => AuthSession(
-        token: token,
-        expiresIn: expiresIn,
-        user: user ?? this.user,
-      );
+  AuthSession copyWith({AuthUser? user}) =>
+      AuthSession(token: token, expiresIn: expiresIn, user: user ?? this.user);
 }

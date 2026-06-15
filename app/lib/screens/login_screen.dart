@@ -67,9 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: 'Senha',
                   icon: Icons.lock_outline,
                   obscure: true,
-                  validator: (v) => (v == null || v.isEmpty)
-                      ? 'Informe sua senha'
-                      : null,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Informe sua senha' : null,
                 ),
                 if (widget.auth.error != null) ...[
                   const SizedBox(height: 16),
@@ -87,7 +86,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Entrar'),
                 ),

@@ -16,8 +16,8 @@ import 'package:http/testing.dart';
 import 'package:mobile_app/main.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/fish_service.dart';
-import 'package:mobile_app/services/water_body_service.dart';
 import 'package:mobile_app/services/token_storage.dart';
+import 'package:mobile_app/services/water_body_service.dart';
 import 'package:mobile_app/state/auth_controller.dart';
 
 import 'support/fake_store.dart';

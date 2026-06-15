@@ -25,8 +25,13 @@ Widget _wrap(FishService service) =>
 
 void main() {
   testWidgets('exibe a lista de peixes vinda do backend', (tester) async {
-    final client = MockClient((_) async => http.Response(_pageJson, 200,
-        headers: {'content-type': 'application/json; charset=utf-8'}));
+    final client = MockClient(
+      (_) async => http.Response(
+        _pageJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
     await tester.pumpWidget(_wrap(FishService(client: client)));
 
     // Estado de carregamento inicial.
@@ -39,8 +44,13 @@ void main() {
   });
 
   testWidgets('filtra a lista pelo texto digitado', (tester) async {
-    final client = MockClient((_) async => http.Response(_pageJson, 200,
-        headers: {'content-type': 'application/json; charset=utf-8'}));
+    final client = MockClient(
+      (_) async => http.Response(
+        _pageJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
     await tester.pumpWidget(_wrap(FishService(client: client)));
     await tester.pumpAndSettle();
 
@@ -56,8 +66,11 @@ void main() {
     final client = MockClient((_) async {
       calls++;
       if (calls == 1) return http.Response('erro', 500);
-      return http.Response(_pageJson, 200,
-          headers: {'content-type': 'application/json; charset=utf-8'});
+      return http.Response(
+        _pageJson,
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
     });
 
     await tester.pumpWidget(_wrap(FishService(client: client)));

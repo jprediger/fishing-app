@@ -72,7 +72,8 @@ class AuthScaffold extends StatelessWidget {
                         subtitle,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85)),
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
                       ),
                       const SizedBox(height: 28),
                       Card(
@@ -122,9 +123,7 @@ class AuthTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -150,8 +149,10 @@ class AuthErrorBanner extends StatelessWidget {
           const Icon(Icons.error_outline, color: Colors.red, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message,
-                style: const TextStyle(color: Colors.red, fontSize: 13)),
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
           ),
         ],
       ),

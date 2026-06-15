@@ -9,6 +9,7 @@ import '../main.dart';
 import '../models/water_body.dart';
 import '../services/api_exception.dart';
 import '../services/water_body_service.dart';
+import 'catch_form_screen.dart';
 
 class MapScreen extends StatefulWidget {
   final WaterBodyService? service;
@@ -351,10 +352,16 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _handleCreateRecordStub() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Registro em breve.')));
+  void _openCatchForm() {
+    final point = _draftPoint;
+    final waterBody = _nearestBody;
+    if (point == null || waterBody == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CatchFormScreen(point: point, waterBody: waterBody),
+      ),
+    );
   }
 
   @override
@@ -420,6 +427,7 @@ class _MapScreenState extends State<MapScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             FloatingActionButton.small(
+              heroTag: 'map-mark-mode',
               backgroundColor: _markingMode ? AppColors.deep : Colors.white,
               foregroundColor: _markingMode ? Colors.white : AppColors.primary,
               onPressed: _toggleMarkMode,
@@ -427,6 +435,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 12),
             FloatingActionButton(
+              heroTag: 'map-recenter',
               backgroundColor: Colors.white,
               foregroundColor: AppColors.primary,
               elevation: 3,
@@ -731,7 +740,7 @@ class _MapScreenState extends State<MapScreen> {
                   borderColor: AppColors.primary.withValues(alpha: 0.2),
                   child: _SelectionBody(
                     body: _nearestBody!,
-                    onCreate: _handleCreateRecordStub,
+                    onCreate: _openCatchForm,
                     distanceLabel: _formatDistance(
                       _nearestBody!.distanceMeters,
                     ),
@@ -837,7 +846,7 @@ class _MapScreenState extends State<MapScreen> {
       final coordinates = geometry['coordinates'];
       if (coordinates is List) {
         return coordinates
-            .whereType<List>()
+            .whereType<List<dynamic>>()
             .map(_latLngList)
             .where((points) => points.length >= 2)
             .map(
@@ -865,7 +874,7 @@ class _MapScreenState extends State<MapScreen> {
       final coordinates = geometry['coordinates'];
       if (coordinates is List) {
         return coordinates
-            .whereType<List>()
+            .whereType<List<dynamic>>()
             .map((polygon) => _polygonFromCoordinates(polygon))
             .toList();
       }
@@ -900,7 +909,7 @@ class _MapScreenState extends State<MapScreen> {
     if (coordinates is! List) return const [];
 
     return coordinates
-        .whereType<List>()
+        .whereType<List<dynamic>>()
         .where((pair) => pair.length >= 2 && pair[0] is num && pair[1] is num)
         .map(
           (pair) =>
@@ -951,10 +960,10 @@ class _SelectionLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(18),
+    return const Padding(
+      padding: EdgeInsets.all(18),
       child: Row(
-        children: const [
+        children: [
           SizedBox(
             width: 18,
             height: 18,

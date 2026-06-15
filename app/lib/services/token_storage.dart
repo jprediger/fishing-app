@@ -18,7 +18,7 @@ class SecureKeyValueStore implements KeyValueStore {
   final FlutterSecureStorage _storage;
 
   SecureKeyValueStore([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
@@ -39,7 +39,8 @@ class TokenStorage {
 
   final KeyValueStore _store;
 
-  TokenStorage({KeyValueStore? store}) : _store = store ?? SecureKeyValueStore();
+  TokenStorage({KeyValueStore? store})
+    : _store = store ?? SecureKeyValueStore();
 
   /// Salva a sessão completa.
   Future<void> save(AuthSession session) async {

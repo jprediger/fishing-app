@@ -34,7 +34,7 @@ class FishService {
         headers: {'Accept': 'application/json'},
       );
     } catch (_) {
-      throw ApiException('Não foi possível conectar ao servidor.');
+      throw const ApiException('Não foi possível conectar ao servidor.');
     }
 
     if (response.statusCode != 200) {

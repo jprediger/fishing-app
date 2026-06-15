@@ -15,30 +15,40 @@ const _loginBody = {
   'token': 'jwt-123',
   'tokenType': 'Bearer',
   'expiresIn': 604800,
-  'user': {'id': 1, 'name': 'Demo', 'email': 'demo@fishing.local', 'role': 'USER'},
+  'user': {
+    'id': 1,
+    'name': 'Demo',
+    'email': 'demo@fishing.local',
+    'role': 'USER',
+  },
 };
 
 AuthController _auth(MockClient client) => AuthController(
-      authService: AuthService(client: client, baseUrl: 'http://test.local'),
-      storage: TokenStorage(store: FakeStore()),
-    );
+  authService: AuthService(client: client, baseUrl: 'http://test.local'),
+  storage: TokenStorage(store: FakeStore()),
+);
 
-Widget _wrap(AuthController auth) =>
-    MaterialApp(home: LoginScreen(auth: auth));
+Widget _wrap(AuthController auth) => MaterialApp(home: LoginScreen(auth: auth));
 
 void main() {
   testWidgets('e-mail inválido mostra erro e não chama a API', (tester) async {
     var called = false;
-    final auth = _auth(MockClient((_) async {
-      called = true;
-      return http.Response('', 200);
-    }));
+    final auth = _auth(
+      MockClient((_) async {
+        called = true;
+        return http.Response('', 200);
+      }),
+    );
     await tester.pumpWidget(_wrap(auth));
 
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'E-mail'), 'invalido');
+      find.widgetWithText(TextFormField, 'E-mail'),
+      'invalido',
+    );
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Senha'), 'qualquer1');
+      find.widgetWithText(TextFormField, 'Senha'),
+      'qualquer1',
+    );
     await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
     await tester.pump();
 
@@ -51,7 +61,9 @@ void main() {
     await tester.pumpWidget(_wrap(auth));
 
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'E-mail'), 'a@a.com');
+      find.widgetWithText(TextFormField, 'E-mail'),
+      'a@a.com',
+    );
     await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
     await tester.pump();
 
@@ -63,9 +75,13 @@ void main() {
     await tester.pumpWidget(_wrap(auth));
 
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'E-mail'), 'a@a.com');
+      find.widgetWithText(TextFormField, 'E-mail'),
+      'a@a.com',
+    );
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Senha'), 'senhaerrada');
+      find.widgetWithText(TextFormField, 'Senha'),
+      'senhaerrada',
+    );
     await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
     await tester.pumpAndSettle();
 
@@ -74,15 +90,25 @@ void main() {
   });
 
   testWidgets('login válido autentica o controller', (tester) async {
-    final auth = _auth(MockClient((_) async => http.Response(
-        jsonEncode(_loginBody), 200,
-        headers: {'content-type': 'application/json; charset=utf-8'})));
+    final auth = _auth(
+      MockClient(
+        (_) async => http.Response(
+          jsonEncode(_loginBody),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
+    );
     await tester.pumpWidget(_wrap(auth));
 
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'E-mail'), 'demo@fishing.local');
+      find.widgetWithText(TextFormField, 'E-mail'),
+      'demo@fishing.local',
+    );
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Senha'), 'demo12345');
+      find.widgetWithText(TextFormField, 'Senha'),
+      'demo12345',
+    );
     await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
     await tester.pumpAndSettle();
 

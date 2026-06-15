@@ -32,8 +32,8 @@ class AuthController extends ChangeNotifier {
   String? _error;
 
   AuthController({AuthService? authService, TokenStorage? storage})
-      : _authService = authService ?? AuthService(),
-        _storage = storage ?? TokenStorage();
+    : _authService = authService ?? AuthService(),
+      _storage = storage ?? TokenStorage();
 
   AuthStatus get status => _status;
   AuthUser? get user => _session?.user;
@@ -49,15 +49,19 @@ class AuthController extends ChangeNotifier {
   Future<void> bootstrap() async {
     final session = await _storage.read();
     _session = session;
-    _status =
-        session != null ? AuthStatus.authenticated : AuthStatus.unauthenticated;
+    _status = session != null
+        ? AuthStatus.authenticated
+        : AuthStatus.unauthenticated;
     notifyListeners();
   }
 
   /// Autentica e persiste a sessão. Retorna `true` em sucesso.
   Future<bool> login(String email, String password) {
     return _run(() async {
-      final session = await _authService.login(email: email, password: password);
+      final session = await _authService.login(
+        email: email,
+        password: password,
+      );
       await _storage.save(session);
       _session = session;
       _status = AuthStatus.authenticated;
@@ -68,7 +72,10 @@ class AuthController extends ChangeNotifier {
   Future<bool> register(String name, String email, String password) {
     return _run(() async {
       await _authService.register(name: name, email: email, password: password);
-      final session = await _authService.login(email: email, password: password);
+      final session = await _authService.login(
+        email: email,
+        password: password,
+      );
       await _storage.save(session);
       _session = session;
       _status = AuthStatus.authenticated;
@@ -80,7 +87,11 @@ class AuthController extends ChangeNotifier {
     return _run(() async {
       final token = _session?.token;
       if (token == null) throw const ApiException('Sessão expirada.');
-      final user = await _authService.updateMe(token, name: name, password: password);
+      final user = await _authService.updateMe(
+        token,
+        name: name,
+        password: password,
+      );
       _session = _session!.copyWith(user: user);
       await _storage.saveUser(user);
     });

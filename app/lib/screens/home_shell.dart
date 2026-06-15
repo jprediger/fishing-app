@@ -4,8 +4,8 @@ import '../services/fish_service.dart';
 import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
 import 'map_screen.dart';
-import 'search_screen.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 
 /// Tela principal que controla a navegação entre as abas
 /// Mapa, Buscar e Eu através de uma BottomNavigationBar.
@@ -19,7 +19,12 @@ class HomeShell extends StatefulWidget {
   /// Sessão atual; alimenta a aba "Eu". Opcional para os testes existentes.
   final AuthController? auth;
 
-  const HomeShell({super.key, this.fishService, this.waterBodyService, this.auth});
+  const HomeShell({
+    super.key,
+    this.fishService,
+    this.waterBodyService,
+    this.auth,
+  });
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -43,10 +48,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

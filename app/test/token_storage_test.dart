@@ -52,12 +52,14 @@ void main() {
       final storage = TokenStorage(store: store);
       await storage.save(_session);
 
-      await storage.saveUser(const AuthUser(
-        id: 7,
-        name: 'João Editado',
-        email: 'joao@test.local',
-        role: UserRole.user,
-      ));
+      await storage.saveUser(
+        const AuthUser(
+          id: 7,
+          name: 'João Editado',
+          email: 'joao@test.local',
+          role: UserRole.user,
+        ),
+      );
 
       final read = await storage.read();
       expect(read!.token, 'abc123');
