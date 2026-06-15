@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
 import '../state/auth_controller.dart';
 import 'auth_widgets.dart';
 import 'register_screen.dart';
@@ -42,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListenableBuilder(
       listenable: widget.auth,
       builder: (context, _) {
@@ -78,16 +78,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 FilledButton(
                   onPressed: busy ? null : _submit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: cs.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: busy
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: cs.onPrimary,
                           ),
                         )
                       : const Text('Entrar'),

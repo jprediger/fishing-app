@@ -264,10 +264,11 @@ class _CatchDetailScreenState extends State<CatchDetailScreen> {
   }
 
   Widget _buildPhotos(CatchRecord record) {
+    final cs = Theme.of(context).colorScheme;
     if (record.photos.isEmpty) {
       return Container(
         height: 220,
-        color: Colors.black12,
+        color: cs.surfaceContainerHighest,
         child: const Center(child: Icon(Icons.photo, size: 56)),
       );
     }
@@ -285,7 +286,7 @@ class _CatchDetailScreenState extends State<CatchDetailScreen> {
                 ? null
                 : {'Authorization': 'Bearer ${widget.authToken}'},
             errorBuilder: (context, error, stackTrace) => Container(
-              color: Colors.black12,
+              color: cs.surfaceContainerHighest,
               child: const Center(child: Icon(Icons.broken_image, size: 56)),
             ),
           );

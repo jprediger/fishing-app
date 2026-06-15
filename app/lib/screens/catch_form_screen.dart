@@ -428,6 +428,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
   }
 
   Widget _buildReviewStep(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
@@ -490,7 +491,7 @@ class _CatchFormScreenState extends State<CatchFormScreen> {
           subtitle: 'Preenchido automaticamente no backend.',
           child: Text(
             'Best-effort: se a API falhar, o registro ainda salva.',
-            style: TextStyle(color: Colors.black.withValues(alpha: 0.7)),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
         ),
       ],
@@ -517,6 +518,7 @@ class _StepHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     const labels = ['Captura', 'Detalhes', 'Revisão'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -532,17 +534,13 @@ class _StepHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
                 color: selected
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.12)
+                    ? cs.primaryContainer
                     : done
-                    ? Colors.green.withValues(alpha: 0.10)
-                    : Colors.white,
+                    ? cs.secondaryContainer
+                    : cs.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: selected
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.black12,
+                  color: selected ? cs.primary : cs.outlineVariant,
                 ),
               ),
               child: Text(
@@ -550,6 +548,11 @@ class _StepHeader extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected
+                      ? cs.onPrimaryContainer
+                      : done
+                      ? cs.onSecondaryContainer
+                      : cs.onSurface,
                 ),
               ),
             ),
@@ -573,6 +576,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -581,7 +585,7 @@ class _SectionCard extends StatelessWidget {
           children: [
             Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.black54)),
+            Text(subtitle, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 16),
             child,
           ],
@@ -604,6 +608,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -612,7 +617,7 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.black54)),
+            Text(subtitle, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 12),
             ...lines.map(
               (line) => Padding(
@@ -663,13 +668,14 @@ class _InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.12),
+        color: cs.tertiaryContainer,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        border: Border.all(color: cs.tertiary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

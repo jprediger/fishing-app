@@ -87,6 +87,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildHeader() {
+    final cs = Theme.of(context).colorScheme;
+    // Brancos intencionais sobre gradiente de marca.
     return Container(
       decoration: const BoxDecoration(
         gradient: AppColors.waterGradient,
@@ -129,7 +131,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           },
                         ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: cs.surface,
                   contentPadding: const EdgeInsets.symmetric(vertical: 0),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -147,6 +149,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildFilters() {
+    final cs = Theme.of(context).colorScheme;
     Widget chip(String label, FishType? type) {
       final selected = _typeFilter == type;
       return Padding(
@@ -155,15 +158,17 @@ class _SearchScreenState extends State<SearchScreen> {
           label: Text(label),
           selected: selected,
           onSelected: (_) => setState(() => _typeFilter = type),
-          backgroundColor: AppColors.deep.withValues(alpha: 0.28),
-          selectedColor: Colors.white,
+          backgroundColor: cs.primaryContainer.withValues(alpha: 0.45),
+          selectedColor: cs.surface,
           surfaceTintColor: Colors.transparent,
           labelStyle: TextStyle(
-            color: selected ? AppColors.deep : Colors.white,
+            color: selected ? cs.onSurface : cs.onPrimary,
             fontWeight: FontWeight.w600,
           ),
           side: BorderSide(
-            color: selected ? Colors.transparent : Colors.white54,
+            color: selected
+                ? Colors.transparent
+                : cs.onPrimary.withValues(alpha: 0.55),
           ),
         ),
       );
@@ -218,6 +223,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _showDetails(Fish fish) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -258,7 +264,7 @@ class _SearchScreenState extends State<SearchScreen> {
               const SizedBox(height: 12),
               Text(
                 fish.description!,
-                style: const TextStyle(height: 1.4, color: Colors.black87),
+                style: TextStyle(height: 1.4, color: cs.onSurface),
               ),
             ],
           ],
@@ -277,6 +283,7 @@ class _FishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -307,19 +314,19 @@ class _FishCard extends StatelessWidget {
                           Flexible(
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.place_outlined,
                                   size: 14,
-                                  color: Colors.black45,
+                                  color: cs.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 2),
                                 Flexible(
                                   child: Text(
                                     fish.region!,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.black54,
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -332,7 +339,7 @@ class _FishCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.black26),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
             ],
           ),
         ),
@@ -401,6 +408,7 @@ class _TypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _colorForType(type);
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -412,7 +420,7 @@ class _TypeBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: color == AppColors.sand ? const Color(0xFF8A6D1B) : color,
+          color: color == AppColors.sand ? cs.onSurface : color,
         ),
       ),
     );
@@ -432,13 +440,17 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            '$label: ',
+            style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+          ),
           Expanded(child: Text(value)),
         ],
       ),
@@ -461,18 +473,19 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: Colors.black26),
+            Icon(icon, size: 56, color: cs.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black54),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 16),

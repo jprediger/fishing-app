@@ -79,6 +79,8 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context, AuthUser? user) {
     final name = user?.name ?? 'Pescador';
     final email = user?.email ?? '';
+    final cs = Theme.of(context).colorScheme;
+    // Brancos intencionais sobre gradiente de marca.
     return Container(
       decoration: const BoxDecoration(
         gradient: AppColors.waterGradient,
@@ -114,10 +116,14 @@ class ProfileScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.25),
                 ),
-                child: const CircleAvatar(
+                child: CircleAvatar(
                   radius: 44,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 52, color: AppColors.primary),
+                  backgroundColor: cs.surface,
+                  child: const Icon(
+                    Icons.person,
+                    size: 52,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -176,6 +182,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: Card(
         child: Padding(
@@ -193,7 +200,7 @@ class _StatCard extends StatelessWidget {
               ),
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -209,14 +216,15 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: Colors.black54,
+          color: cs.onSurfaceVariant,
           letterSpacing: 0.4,
         ),
       ),
@@ -233,6 +241,7 @@ class _ProfileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
@@ -242,6 +251,7 @@ class _ProfileTile extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
+              // brand accent stays fixed; surface text follows theme.
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: AppColors.primary, size: 20),
@@ -250,7 +260,7 @@ class _ProfileTile extends StatelessWidget {
             title,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          trailing: const Icon(Icons.chevron_right, color: Colors.black26),
+          trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
           onTap: onTap,
         ),
       ),

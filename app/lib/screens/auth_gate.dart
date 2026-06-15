@@ -53,6 +53,7 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Brancos intencionais sobre gradiente de marca.
     return const Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: AppColors.waterGradient),

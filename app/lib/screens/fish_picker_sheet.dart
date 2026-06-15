@@ -76,6 +76,7 @@ class _FishPickerSheetState extends State<FishPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -88,7 +89,7 @@ class _FishPickerSheetState extends State<FishPickerSheet> {
                 width: 42,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.black12,
+                  color: cs.outlineVariant,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
