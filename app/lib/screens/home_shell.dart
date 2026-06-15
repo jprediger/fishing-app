@@ -9,6 +9,7 @@ import '../services/water_body_service.dart';
 import '../state/auth_controller.dart';
 import 'establishment_search_screen.dart';
 import 'map_screen.dart';
+import 'posts_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 
@@ -76,6 +77,11 @@ class _HomeShellState extends State<HomeShell> {
         authToken: widget.auth?.token,
         focusEstablishment: _focusedEstablishment,
       ),
+      PostsScreen(
+        catchService: widget.catchService,
+        fishService: widget.fishService,
+        authToken: widget.auth?.token,
+      ),
       SearchScreen(service: widget.fishService),
       EstablishmentSearchScreen(
         service: widget.establishmentService,
@@ -101,6 +107,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map),
             label: 'Mapa',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.dynamic_feed_outlined),
+            selectedIcon: Icon(Icons.dynamic_feed),
+            label: 'Posts',
           ),
           NavigationDestination(
             icon: Icon(Icons.search),

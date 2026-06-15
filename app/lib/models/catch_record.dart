@@ -174,6 +174,7 @@ class CatchRecord {
   final DateTime caughtAt;
   final List<CatchPhoto> photos;
   final CatchWeather? weather;
+  final bool shared;
   final bool mine;
   final CatchAuthor? author;
 
@@ -191,6 +192,7 @@ class CatchRecord {
     required this.caughtAt,
     this.photos = const [],
     this.weather,
+    this.shared = true,
     this.mine = false,
     this.author,
   });
@@ -225,6 +227,7 @@ class CatchRecord {
               (json['weather'] as Map<String, dynamic>).isNotEmpty
           ? CatchWeather.fromJson(json['weather'] as Map<String, dynamic>)
           : null,
+      shared: json['shared'] as bool? ?? true,
       mine: json['mine'] as bool? ?? false,
       author: json['author'] is Map<String, dynamic>
           ? CatchAuthor.fromJson(json['author'] as Map<String, dynamic>)
@@ -244,6 +247,7 @@ class CatchCreateRequest {
   final FishingMethod fishingMethod;
   final FishingPurpose purpose;
   final DateTime caughtAt;
+  final bool shared;
 
   const CatchCreateRequest({
     required this.waterBodyId,
@@ -256,6 +260,7 @@ class CatchCreateRequest {
     required this.fishingMethod,
     required this.purpose,
     required this.caughtAt,
+    this.shared = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -270,5 +275,6 @@ class CatchCreateRequest {
     'fishingMethod': fishingMethod.apiValue,
     'purpose': purpose.apiValue,
     'caughtAt': caughtAt.toUtc().toIso8601String(),
+    'shared': shared,
   };
 }

@@ -21,6 +21,9 @@ class CatchDraft extends ChangeNotifier {
   int? lengthMm;
   String? description;
 
+  /// Quando false, a pesca fica privada (não é compartilhada nos feeds).
+  bool shared;
+
   CatchDraft({
     required this.point,
     required this.waterBody,
@@ -33,11 +36,13 @@ class CatchDraft extends ChangeNotifier {
     this.weightGrams,
     this.lengthMm,
     this.description,
+    bool? shared,
   }) : photos = List<XFile>.from(photos ?? const []),
        caughtAt = caughtAt ?? DateTime.now(),
        locationVisibility = locationVisibility ?? LocationVisibility.exact,
        fishingMethod = fishingMethod ?? FishingMethod.arremesso,
-       purpose = purpose ?? FishingPurpose.sport;
+       purpose = purpose ?? FishingPurpose.sport,
+       shared = shared ?? true;
 
   factory CatchDraft.fromRecord(CatchRecord record) {
     return CatchDraft(
@@ -55,6 +60,7 @@ class CatchDraft extends ChangeNotifier {
       weightGrams: record.weightGrams,
       lengthMm: record.lengthMm,
       description: record.description,
+      shared: record.shared,
     );
   }
 
@@ -98,6 +104,11 @@ class CatchDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setShared(bool value) {
+    shared = value;
+    notifyListeners();
+  }
+
   void addPhotos(Iterable<XFile> value) {
     photos.addAll(value);
     notifyListeners();
@@ -127,6 +138,7 @@ class CatchDraft extends ChangeNotifier {
       fishingMethod: fishingMethod,
       purpose: purpose,
       caughtAt: caughtAt.toUtc(),
+      shared: shared,
     );
   }
 }
